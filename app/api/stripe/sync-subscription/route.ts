@@ -92,19 +92,19 @@ export async function POST(request: NextRequest) {
         status:
           stripeSubscription.status === "trialing" ? "trialing" : "active",
         currentPeriodStart: new Date(
-          stripeSubscription.current_period_start * 1000
+          stripeSubscription.currentPeriodStart * 1000
         ),
         currentPeriodEnd: new Date(
-          stripeSubscription.current_period_end * 1000
+          stripeSubscription.currentPeriodEnd * 1000
         ),
-        nextBillingDate: new Date(stripeSubscription.current_period_end * 1000),
-        trialStart: stripeSubscription.trial_start
-          ? new Date(stripeSubscription.trial_start * 1000)
+        nextBillingDate: new Date(stripeSubscription.currentPeriodEnd * 1000),
+        trialStart: stripeSubscription.trialStart
+          ? new Date(stripeSubscription.trialStart * 1000)
           : null,
-        trialEnd: stripeSubscription.trial_end
-          ? new Date(stripeSubscription.trial_end * 1000)
+        trialEnd: stripeSubscription.trialEnd
+          ? new Date(stripeSubscription.trialEnd * 1000)
           : null,
-        autoRenew: !stripeSubscription.cancel_at_period_end,
+        autoRenew: !stripeSubscription.cancelAtPeriodEnd,
         stripeSubscriptionId: stripeSubscription.id,
         stripeCustomerId: stripeSubscription.customer as string,
         metadata: {
