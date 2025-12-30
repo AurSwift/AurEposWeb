@@ -296,7 +296,6 @@ export const supportTickets = pgTable(
   "support_tickets",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ticketNumber: varchar("ticket_number", { length: 20 }).notNull().unique(), // e.g., "TKT-2024-001234"
     customerId: uuid("customer_id")
       .references(() => customers.id)
       .notNull(),
@@ -308,8 +307,6 @@ export const supportTickets = pgTable(
     response: text("response"), // Admin response
     respondedAt: timestamp("responded_at", { withTimezone: true }),
     respondedBy: uuid("responded_by"), // Admin user ID
-    firstResponseAt: timestamp("first_response_at", { withTimezone: true }), // SLA tracking
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -318,43 +315,11 @@ export const supportTickets = pgTable(
       .notNull(),
   },
   (table) => ({
-    ticketNumberIdx: index("support_tickets_ticket_number_idx").on(table.ticketNumber),
     customerIdIdx: index("support_tickets_customer_id_idx").on(table.customerId),
     statusIdx: index("support_tickets_status_idx").on(table.status),
     createdAtIdx: index("support_tickets_created_at_idx").on(table.createdAt),
   })
 );
-
-// Ticket attachments table
-export const ticketAttachments = pgTable("ticket_attachments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  ticketId: uuid("ticket_id")
-    .references(() => supportTickets.id, { onDelete: "cascade" })
-    .notNull(),
-  fileName: varchar("file_name", { length: 255 }).notNull(),
-  fileUrl: text("file_url").notNull(),
-  fileSize: integer("file_size").notNull(), // Size in bytes
-  mimeType: varchar("mime_type", { length: 100 }),
-  uploadedBy: uuid("uploaded_by").references(() => customers.id), // Customer or admin
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
-
-// Ticket threads table (for conversations)
-export const ticketThreads = pgTable("ticket_threads", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  ticketId: uuid("ticket_id")
-    .references(() => supportTickets.id, { onDelete: "cascade" })
-    .notNull(),
-  message: text("message").notNull(),
-  authorId: uuid("author_id").notNull(), // Customer or admin user ID
-  authorType: varchar("author_type", { length: 20 }).notNull(), // 'customer' or 'admin'
-  isInternal: boolean("is_internal").default(false).notNull(), // Internal notes (admin only)
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
 
 // Relations
 export const customersRelations = relations(customers, ({ one, many }) => ({
@@ -426,26 +391,10 @@ export const subscriptionChangesRelations = relations(
   })
 );
 
-export const supportTicketsRelations = relations(supportTickets, ({ one, many }) => ({
+export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
   customer: one(customers, {
     fields: [supportTickets.customerId],
     references: [customers.id],
-  }),
-  attachments: many(ticketAttachments),
-  threads: many(ticketThreads),
-}));
-
-export const ticketAttachmentsRelations = relations(ticketAttachments, ({ one }) => ({
-  ticket: one(supportTickets, {
-    fields: [ticketAttachments.ticketId],
-    references: [supportTickets.id],
-  }),
-}));
-
-export const ticketThreadsRelations = relations(ticketThreads, ({ one }) => ({
-  ticket: one(supportTickets, {
-    fields: [ticketThreads.ticketId],
-    references: [supportTickets.id],
   }),
 }));
 
@@ -499,7 +448,3 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export type NewSupportTicket = typeof supportTickets.$inferInsert;
-export type TicketAttachment = typeof ticketAttachments.$inferSelect;
-export type NewTicketAttachment = typeof ticketAttachments.$inferInsert;
-export type TicketThread = typeof ticketThreads.$inferSelect;
-export type NewTicketThread = typeof ticketThreads.$inferInsert;

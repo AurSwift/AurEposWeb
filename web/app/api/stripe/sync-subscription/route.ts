@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { customers, subscriptions, licenseKeys } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getPlan } from "@/lib/stripe/plans";
-import crypto from "crypto";
+import { generateLicenseKey } from "@/lib/license/generator";
 
 /**
  * POST /api/stripe/sync-subscription
@@ -113,14 +113,8 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Generate license key
-    const licenseKeyValue = `AURA-${crypto
-      .randomBytes(3)
-      .toString("hex")
-      .toUpperCase()}-${crypto
-      .randomBytes(3)
-      .toString("hex")
-      .toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+    // Generate and store license key using proper generator
+    const licenseKeyValue = generateLicenseKey(plan.id, customer.id);
 
     // Create license key
     await db.insert(licenseKeys).values({
@@ -129,7 +123,7 @@ export async function POST(request: NextRequest) {
       licenseKey: licenseKeyValue,
       maxTerminals: plan.features.maxTerminals,
       activationCount: 0,
-      version: "1.0",
+      version: "2.0",
       issuedAt: new Date(),
       isActive: true,
     });

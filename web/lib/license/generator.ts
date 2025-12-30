@@ -11,8 +11,8 @@ const PLAN_CODES: Record<PlanId, string> = {
 
 /**
  * Generate license key following business rules:
- * Format: EPOS-{PlanCode}-V{Version}-{Random8Char}-{Checksum}
- * Example: EPOS-PRO-V2-7A83B2D4-E9
+ * Format: AUR-{PlanCode}-V{Version}-{Random8Char}-{Checksum}
+ * Example: AUR-PRO-V2-7A83B2D4-E9
  */
 export function generateLicenseKey(planId: PlanId, customerId: string): string {
   const planCode = PLAN_CODES[planId];
@@ -52,7 +52,7 @@ function calculateChecksum(key: string): string {
  * Validate license key format
  */
 export function validateLicenseKeyFormat(key: string): boolean {
-  const pattern = /^EPOS-(BAS|PRO|ENT)-V[0-9]-[A-Z0-9]{8}-[A-Z0-9]{2}$/;
+  const pattern = /^AUR-(BAS|PRO|ENT)-V[0-9]-[A-Z0-9]{8}-[A-Z0-9]{2}$/;
   return pattern.test(key);
 }
 

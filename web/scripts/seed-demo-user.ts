@@ -7,6 +7,7 @@ import { db } from "../lib/db";
 import { users, customers, subscriptions, licenseKeys } from "../lib/db/schema";
 import { hashPassword } from "../lib/auth-utils";
 import { eq } from "drizzle-orm";
+import { generateLicenseKey } from "../lib/license/generator";
 
 async function seedDemoUser() {
   try {
@@ -74,16 +75,17 @@ async function seedDemoUser() {
 
     console.log("Created subscription:", subscription.id);
 
-    // Create license key
+    // Generate and create license key with proper format
+    const generatedLicenseKey = generateLicenseKey("professional", customer.id);
     const [licenseKey] = await db
       .insert(licenseKeys)
       .values({
         customerId: customer.id,
         subscriptionId: subscription.id,
-        licenseKey: "AURA-4B2F-8K9M-3P7Q",
+        licenseKey: generatedLicenseKey,
         maxTerminals: 5,
         activationCount: 0,
-        version: "1.0",
+        version: "2.0",
         issuedAt: new Date(),
         isActive: true,
       })
