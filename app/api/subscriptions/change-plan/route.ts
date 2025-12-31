@@ -16,6 +16,7 @@ import {
   type BillingCycle,
 } from "@/lib/stripe/plans";
 import { createProrationPayment } from "@/lib/db/payment-helpers";
+import Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
           price: newPrice.toString(),
           updatedAt: new Date(),
           metadata: {
-            ...currentSub.metadata,
+            ...(currentSub.metadata || {}),
             stripePriceId: newPriceId,
           },
         })
@@ -174,8 +175,8 @@ export async function POST(request: NextRequest) {
         subscriptionId,
         prorationAmount,
         currency,
-        new Date(updatedSubscription.current_period_start * 1000),
-        new Date(updatedSubscription.current_period_end * 1000),
+        new Date((updatedSubscription as any).current_period_start * 1000),
+        new Date((updatedSubscription as any).current_period_end * 1000),
         stripePaymentId,
         invoiceUrl,
         tx

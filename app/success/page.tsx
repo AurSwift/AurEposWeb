@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ interface Subscription {
   trialEnd?: Date;
 }
 
-export default function SuccessPage() {
+function SuccessPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams?.get("session_id");
@@ -30,43 +30,6 @@ export default function SuccessPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function syncSubscription() {
-      if (!sessionId) {
-        setError("No session ID found");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Call sync endpoint
-        const response = await fetch("/api/stripe/sync-subscription", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to sync subscription");
-        }
-
-        setSubscription(data.subscription);
-        setLicenseKey(data.licenseKey);
-      } catch (err) {
-        console.error("Sync error:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to load subscription"
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    syncSubscription();
-  }, [sessionId]);
 
   useEffect(() => {
     async function syncSubscription() {
@@ -220,5 +183,22 @@ export default function SuccessPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-neutral-light">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <SuccessPageContent />
+    </Suspense>
   );
 }

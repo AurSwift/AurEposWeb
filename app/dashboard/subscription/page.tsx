@@ -43,7 +43,7 @@ export default function SubscriptionPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Payment History</h2>
             </div>
-            <PaymentHistory refreshTrigger={refreshTrigger} />
+            <PaymentHistory />
           </section>
         </div>
 

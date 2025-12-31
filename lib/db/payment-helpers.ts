@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 // Transaction type - accepts any object with the same interface as db
 // This allows both db and transaction objects to be passed
-type DbOrTransaction = typeof db;
+type DbOrTransaction = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export interface CreatePaymentData {
   customerId: string;

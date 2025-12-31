@@ -6,6 +6,7 @@ import { customers, subscriptions, licenseKeys } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getPlan } from "@/lib/stripe/plans";
 import { generateLicenseKey } from "@/lib/license/generator";
+import Stripe from "stripe";
 
 /**
  * POST /api/stripe/sync-subscription
@@ -52,10 +53,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const stripeSubscription =
+    const stripeSubscription: Stripe.Subscription =
       typeof checkoutSession.subscription === "string"
         ? await stripe.subscriptions.retrieve(checkoutSession.subscription)
-        : checkoutSession.subscription;
+        : (checkoutSession.subscription as Stripe.Subscription);
 
     // Check if subscription already exists
     const [existingSub] = await db
@@ -92,19 +93,19 @@ export async function POST(request: NextRequest) {
         status:
           stripeSubscription.status === "trialing" ? "trialing" : "active",
         currentPeriodStart: new Date(
-          stripeSubscription.currentPeriodStart * 1000
+          (stripeSubscription as any).current_period_start * 1000
         ),
         currentPeriodEnd: new Date(
-          stripeSubscription.currentPeriodEnd * 1000
+          (stripeSubscription as any).current_period_end * 1000
         ),
-        nextBillingDate: new Date(stripeSubscription.currentPeriodEnd * 1000),
-        trialStart: stripeSubscription.trialStart
-          ? new Date(stripeSubscription.trialStart * 1000)
+        nextBillingDate: new Date((stripeSubscription as any).current_period_end * 1000),
+        trialStart: (stripeSubscription as any).trial_start
+          ? new Date((stripeSubscription as any).trial_start * 1000)
           : null,
-        trialEnd: stripeSubscription.trialEnd
-          ? new Date(stripeSubscription.trialEnd * 1000)
+        trialEnd: (stripeSubscription as any).trial_end
+          ? new Date((stripeSubscription as any).trial_end * 1000)
           : null,
-        autoRenew: !stripeSubscription.cancelAtPeriodEnd,
+        autoRenew: !(stripeSubscription as any).cancel_at_period_end,
         stripeSubscriptionId: stripeSubscription.id,
         stripeCustomerId: stripeSubscription.customer as string,
         metadata: {

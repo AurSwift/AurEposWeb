@@ -29,6 +29,10 @@ async function migrateLicenseKeys() {
         console.log(`❌ Old format: ${license.licenseKey}`);
 
         // Get subscription to determine plan
+        if (!license.subscriptionId) {
+          console.log(`   ⚠️  No subscription ID, skipping...`);
+          continue;
+        }
         const [subscription] = await db
           .select()
           .from(subscriptions)
