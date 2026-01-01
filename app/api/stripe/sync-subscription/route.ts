@@ -53,10 +53,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const stripeSubscription: Stripe.Subscription =
+    const subscriptionId =
       typeof checkoutSession.subscription === "string"
-        ? await stripe.subscriptions.retrieve(checkoutSession.subscription)
-        : (checkoutSession.subscription as Stripe.Subscription);
+        ? checkoutSession.subscription
+        : checkoutSession.subscription?.id;
+
+    if (!subscriptionId) {
+      return NextResponse.json(
+        { error: "No subscription ID found" },
+        { status: 404 }
+      );
+    }
+
+    const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+    // Access subscription properties with type safety
+    // These properties exist on Stripe.Subscription but may not be in the type definition
+    const currentPeriodStart = (stripeSubscription as any).current_period_start as number | null | undefined;
+    const currentPeriodEnd = (stripeSubscription as any).current_period_end as number | null | undefined;
+    const trialStart = stripeSubscription.trial_start as number | null | undefined;
+    const trialEnd = stripeSubscription.trial_end as number | null | undefined;
+
+    // Type guard to ensure we have the required properties
+    if (!currentPeriodStart || !currentPeriodEnd) {
+      return NextResponse.json(
+        { error: "Subscription missing required period dates" },
+        { status: 400 }
+      );
+    }
 
     // Check if subscription already exists
     const [existingSub] = await db
@@ -83,21 +107,21 @@ export async function POST(request: NextRequest) {
 
     // Log subscription data for debugging
     console.log("Stripe subscription data:", {
-      current_period_start: stripeSubscription.current_period_start,
-      current_period_end: stripeSubscription.current_period_end,
-      trial_start: stripeSubscription.trial_start,
-      trial_end: stripeSubscription.trial_end,
+      current_period_start: currentPeriodStart,
+      current_period_end: currentPeriodEnd,
+      trial_start: trialStart ?? null,
+      trial_end: trialEnd ?? null,
       status: stripeSubscription.status,
     });
 
     // Handle trialing subscriptions - use trial dates as period dates
     const isTrialing = stripeSubscription.status === "trialing";
-    const currentPeriodStart = isTrialing
-      ? stripeSubscription.trial_start!
-      : stripeSubscription.current_period_start;
-    const currentPeriodEnd = isTrialing
-      ? stripeSubscription.trial_end!
-      : stripeSubscription.current_period_end;
+    const periodStart = isTrialing
+      ? (trialStart ?? currentPeriodStart)
+      : currentPeriodStart;
+    const periodEnd = isTrialing
+      ? (trialEnd ?? currentPeriodEnd)
+      : currentPeriodEnd;
 
     // Validate timestamps before creating dates
     const validateTimestamp = (
@@ -124,22 +148,22 @@ export async function POST(request: NextRequest) {
         price: price.toString(),
         status: isTrialing ? "trialing" : "active",
         currentPeriodStart: new Date(
-          validateTimestamp(currentPeriodStart, "current_period_start") * 1000
+          validateTimestamp(periodStart, "current_period_start") * 1000
         ),
         currentPeriodEnd: new Date(
-          validateTimestamp(currentPeriodEnd, "current_period_end") * 1000
+          validateTimestamp(periodEnd, "current_period_end") * 1000
         ),
         nextBillingDate: new Date(
           validateTimestamp(
-            currentPeriodEnd,
+            periodEnd,
             "current_period_end (nextBillingDate)"
           ) * 1000
         ),
-        trialStart: stripeSubscription.trial_start
-          ? new Date(stripeSubscription.trial_start * 1000)
+        trialStart: trialStart
+          ? new Date(trialStart * 1000)
           : null,
-        trialEnd: stripeSubscription.trial_end
-          ? new Date(stripeSubscription.trial_end * 1000)
+        trialEnd: trialEnd
+          ? new Date(trialEnd * 1000)
           : null,
         autoRenew: !stripeSubscription.cancel_at_period_end,
         stripeSubscriptionId: stripeSubscription.id,
