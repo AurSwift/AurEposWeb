@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePasswordResetToken } from "@/lib/auth-utils";
 import { getUserByEmail } from "@/lib/auth-utils";
-import { Resend } from "resend";
+import { sendVerificationEmail } from "@/lib/email";
+import nodemailer from "nodemailer";
 
-function getResend() {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error("RESEND_API_KEY environment variable is not set");
+function createTransporter() {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    throw new Error(
+      "GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required"
+    );
   }
-  return new Resend(process.env.RESEND_API_KEY);
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -33,17 +43,19 @@ export async function POST(request: NextRequest) {
       process.env.NEXTAUTH_URL || "http://localhost:3000"
     }/reset-password?token=${resetToken}`;
 
-    // Send email using Resend
+    // Send email using Gmail SMTP
     try {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
+      const transporter = createTransporter();
+      const fromEmail = process.env.GMAIL_USER || process.env.GMAIL_FROM_EMAIL;
+
+      await transporter.sendMail({
+        from: `"aurswift" <${fromEmail}>`,
         to: email,
-        subject: "Reset Your Password - Auraswif",
+        subject: "Reset Your Password - aurswift",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Reset Your Password</h2>
-            <p>You requested to reset your password for your Auraswif account.</p>
+            <p>You requested to reset your password for your aurswift account.</p>
             <p>Click the button below to reset your password:</p>
             <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0;">
               Reset Password

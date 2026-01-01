@@ -73,8 +73,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="mailto:support@auraswif.com" className="text-sm text-muted-foreground hover:text-foreground">
-                  support@auraswif.com
+                <a href="mailto:support@aurswift.com" className="text-sm text-muted-foreground hover:text-foreground">
+                  support@aurswift.com
                 </a>
               </li>
             </ul>
@@ -84,13 +84,13 @@ export function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <span className="text-lg font-bold text-primary-foreground">A</span>
               </div>
-              <span className="font-bold text-foreground">Auraswif</span>
+              <span className="font-bold text-foreground">aurswift</span>
             </div>
             <p className="text-sm text-muted-foreground">Smart Commerce, Simplified.</p>
           </div>
         </div>
         <div className="mt-8 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Auraswif. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} aurswift. All rights reserved.</p>
         </div>
       </div>
     </footer>

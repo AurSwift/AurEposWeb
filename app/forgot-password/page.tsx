@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                 <span className="text-white font-bold text-lg">A</span>
               </div>
-              <CardTitle className="text-2xl font-bold">Auraswif</CardTitle>
+              <CardTitle className="text-2xl font-bold">aurswift</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -63,7 +63,7 @@ export default function BillingHistoryPage() {
     } else {
       // Generate fallback invoice text
       const invoiceContent = `
-AURASWIF EPOS SOLUTIONS
+aurswift EPOS SOLUTIONS
 Invoice: ${invoice.invoiceId}
 Date: ${format(new Date(invoice.date), "MMM dd, yyyy")}
 

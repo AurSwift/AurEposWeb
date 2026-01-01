@@ -15,6 +15,7 @@
 2. Click **"+ Add product"**
 
 #### Product 1: Basic Plan
+
 ```
 Name: Basic Plan
 Description: Perfect for small businesses
@@ -35,10 +36,12 @@ Metadata:
 ```
 
 Copy the Price IDs:
-- Monthly: `price_...` 
+
+- Monthly: `price_...`
 - Annual: `price_...`
 
 #### Product 2: Professional Plan
+
 ```
 Name: Professional Plan
 Description: For growing businesses
@@ -59,10 +62,12 @@ Metadata:
 ```
 
 Copy the Price IDs:
+
 - Monthly: `price_...`
 - Annual: `price_...`
 
 #### Product 3: Enterprise Plan
+
 ```
 Name: Enterprise Plan
 Description: For large organizations
@@ -83,12 +88,13 @@ Metadata:
 ```
 
 Copy the Price IDs:
+
 - Monthly: `price_...`
 - Annual: `price_...`
 
 ### Step 3: Update .env.local
 
-Open `/Users/admin/Documents/Developer/FullStackDev/AuraSwift/web/.env.local` and add:
+Open `/Users/admin/Documents/Developer/FullStackDev/aurswift/web/.env.local` and add:
 
 ```env
 # Stripe Configuration
@@ -108,7 +114,7 @@ STRIPE_PRICE_ID_ENTERPRISE_ANNUAL=price_YOUR_ENTERPRISE_ANNUAL_ID
 ### Step 4: Restart Server
 
 ```bash
-cd /Users/admin/Documents/Developer/FullStackDev/AuraSwift/web
+cd /Users/admin/Documents/Developer/FullStackDev/aurswift/web
 pkill -f "next dev"
 npm run dev
 ```
@@ -137,16 +143,19 @@ npm run dev
 ## 🧪 Test the Full Flow
 
 ### 1. Create Test Account
+
 - Go to http://localhost:3000/signup
 - Fill in company name, email, password
 - Click "Sign Up"
 
 ### 2. Select Plan
+
 - Choose a plan (e.g., Professional)
 - Select billing cycle (Monthly or Annual)
 - Click "Select Plan"
 
 ### 3. Complete Checkout
+
 - You'll be redirected to Stripe Checkout
 - Use test card: `4242 4242 4242 4242`
 - Expiry: Any future date (e.g., 12/25)
@@ -154,6 +163,7 @@ npm run dev
 - Click "Pay"
 
 ### 4. Verify Success
+
 - You should be redirected to `/success`
 - License key should be displayed
 - Dashboard should show subscription details
@@ -165,18 +175,21 @@ npm run dev
 ### Pricing still not loading?
 
 **Check 1**: Verify environment variables are set
+
 ```bash
-cd /Users/admin/Documents/Developer/FullStackDev/AuraSwift/web
+cd /Users/admin/Documents/Developer/FullStackDev/aurswift/web
 grep STRIPE .env.local
 ```
 
 **Check 2**: Restart dev server completely
+
 ```bash
 pkill -f "next dev"
 npm run dev
 ```
 
 **Check 3**: Check API endpoint
+
 ```bash
 curl http://localhost:3000/api/plans
 ```
@@ -204,12 +217,14 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 ### Database not updating?
 
 **Check webhook logs**:
+
 ```bash
 # In your terminal running the dev server, look for:
 ✅ Subscription created: sub_..., License: EPOS-PRO-V2-...
 ```
 
 **Check database**:
+
 ```bash
 psql $DATABASE_URL -c "SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT 1;"
 ```

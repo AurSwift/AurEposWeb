@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +19,7 @@ import { AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { PlanCard } from "@/components/pricing/plan-card";
 import { BillingToggle } from "@/components/pricing/billing-toggle";
 import { type PlanId, type BillingCycle, type Plan } from "@/lib/stripe/plans";
+import { VerificationPending } from "@/components/auth/verification-pending";
 
 // Helper function to calculate annual savings
 function calculateAnnualSavings(plan: Plan): number {
@@ -27,7 +27,7 @@ function calculateAnnualSavings(plan: Plan): number {
   return monthlyTotal - plan.priceAnnual;
 }
 
-type Step = "account" | "plan" | "billing";
+type Step = "account" | "verification" | "plan" | "billing";
 
 function SignupPageContent() {
   const router = useRouter();
@@ -45,6 +45,7 @@ function SignupPageContent() {
     billingCycle: "monthly" as BillingCycle,
     agreeToTerms: false,
   });
+  const [verifiedEmail, setVerifiedEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -102,20 +103,11 @@ function SignupPageContent() {
         return;
       }
 
-      // Auto sign in
-      const result = await signIn("credentials", {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
-      });
+      // Store email for verification pending screen
+      setVerifiedEmail(formData.email);
 
-      if (result?.error) {
-        setError("Account created but sign in failed");
-        return;
-      }
-
-      // Move to plan selection
-      setStep("plan");
+      // Move to verification pending step (DO NOT auto-login)
+      setStep("verification");
     } catch (err) {
       setError("Something went wrong");
     } finally {
@@ -167,33 +159,61 @@ function SignupPageContent() {
     }
   };
 
+  // Render Verification Pending Step
+  if (step === "verification") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
+        {/* Decorative gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+
+        <div className="relative z-10 w-full">
+          <VerificationPending email={verifiedEmail} />
+        </div>
+      </div>
+    );
+  }
+
   // Render Account Step
   if (step === "account") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-light p-4">
-        <Card className="w-full max-w-lg">
-          <CardHeader className="space-y-1 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
+        {/* Decorative gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+
+        <Card className="w-full max-w-lg relative z-10 shadow-xl border-border/50 backdrop-blur-sm">
+          <CardHeader className="space-y-1 text-center pb-6">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                <span className="text-primary-foreground font-bold text-xl">
+                  A
+                </span>
               </div>
-              <CardTitle className="text-2xl font-bold">Auraswif</CardTitle>
+              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                Aurswift
+              </CardTitle>
             </div>
-            <CardDescription>
+            <CardDescription className="text-base">
               Create your account and start your free trial
             </CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
-              <Alert variant="destructive" className="mb-4">
+              <Alert
+                variant="destructive"
+                className="mb-6 animate-in fade-in-50"
+              >
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            <form onSubmit={handleAccountSubmit} className="space-y-4">
+            <form onSubmit={handleAccountSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
+                <Label htmlFor="companyName" className="text-sm font-medium">
+                  Company Name
+                </Label>
                 <Input
                   id="companyName"
                   type="text"
@@ -203,11 +223,14 @@ function SignupPageContent() {
                     setFormData({ ...formData, companyName: e.target.value })
                   }
                   required
+                  className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Work Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Work Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -217,11 +240,14 @@ function SignupPageContent() {
                     setFormData({ ...formData, email: e.target.value })
                   }
                   required
+                  className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </Label>
                 <Input
                   id="password"
                   type="password"
@@ -232,13 +258,14 @@ function SignupPageContent() {
                   }
                   required
                   minLength={8}
+                  className="h-11"
                 />
                 <p className="text-xs text-muted-foreground">
                   Must be at least 8 characters
                 </p>
               </div>
 
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-3">
                 <Checkbox
                   id="terms"
                   checked={formData.agreeToTerms}
@@ -248,17 +275,24 @@ function SignupPageContent() {
                       agreeToTerms: checked as boolean,
                     })
                   }
+                  className="mt-0.5"
                 />
                 <Label
                   htmlFor="terms"
                   className="text-sm leading-relaxed cursor-pointer"
                 >
                   I agree to the{" "}
-                  <Link href="/terms" className="text-accent hover:underline">
+                  <Link
+                    href="/terms"
+                    className="text-primary hover:underline font-medium"
+                  >
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link href="/privacy" className="text-accent hover:underline">
+                  <Link
+                    href="/privacy"
+                    className="text-primary hover:underline font-medium"
+                  >
                     Privacy Policy
                   </Link>
                 </Label>
@@ -266,7 +300,7 @@ function SignupPageContent() {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-11 text-base font-medium"
                 size="lg"
                 disabled={isLoading || !formData.agreeToTerms}
               >
@@ -275,11 +309,11 @@ function SignupPageContent() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            <div className="mt-6 text-center text-sm text-muted-foreground pt-2">
               Already have an account?{" "}
               <Link
                 href="/login"
-                className="text-accent hover:underline font-medium"
+                className="text-primary hover:underline font-medium"
               >
                 Sign in
               </Link>
@@ -293,28 +327,37 @@ function SignupPageContent() {
   // Render Plan Selection Step
   if (step === "plan") {
     return (
-      <div className="min-h-screen py-12 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Choose Your Plan</h1>
-            <p className="text-muted-foreground">
+      <div className="min-h-screen py-12 px-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
+        {/* Decorative gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-10">
+            <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Choose Your Plan
+            </h1>
+            <p className="text-muted-foreground text-lg">
               Select the plan that best fits your business needs
             </p>
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mb-6 max-w-2xl mx-auto">
+            <Alert
+              variant="destructive"
+              className="mb-8 max-w-2xl mx-auto animate-in fade-in-50"
+            >
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           {plansLoading ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Loading plans...</p>
+            <div className="text-center py-16">
+              <p className="text-muted-foreground text-lg">Loading plans...</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="grid md:grid-cols-3 gap-6 mb-10">
               {Object.values(plans).map((plan) => (
                 <PlanCard
                   key={plan.id}
@@ -328,7 +371,11 @@ function SignupPageContent() {
           )}
 
           <div className="text-center">
-            <Button variant="ghost" onClick={() => setStep("account")}>
+            <Button
+              variant="ghost"
+              onClick={() => setStep("account")}
+              size="lg"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
@@ -343,16 +390,18 @@ function SignupPageContent() {
     const plan = plans[formData.planId];
     if (!plan) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-light p-4">
-          <Card className="w-full max-w-2xl">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
+          <Card className="w-full max-w-2xl relative z-10 shadow-xl border-border/50">
             <CardContent className="pt-6">
-              <p className="text-muted-foreground mb-4">
+              <p className="text-muted-foreground mb-6 text-center">
                 Plan not found. Please go back and select a plan.
               </p>
-              <Button onClick={() => setStep("plan")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Plans
-              </Button>
+              <div className="flex justify-center">
+                <Button onClick={() => setStep("plan")} size="lg">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Plans
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -365,17 +414,23 @@ function SignupPageContent() {
     const savings = calculateAnnualSavings(plan);
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-light p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
+        {/* Decorative gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+
+        <Card className="w-full max-w-2xl relative z-10 shadow-xl border-border/50 backdrop-blur-sm">
+          <CardHeader className="space-y-1 text-center pb-6">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               Select Billing Cycle
             </CardTitle>
-            <CardDescription>Selected: {plan.name} Plan</CardDescription>
+            <CardDescription className="text-base">
+              Selected: {plan.name} Plan
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="animate-in fade-in-50">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -388,14 +443,14 @@ function SignupPageContent() {
               }
             />
 
-            <div className="bg-muted p-6 rounded-lg space-y-4">
+            <div className="bg-muted/50 backdrop-blur-sm p-6 rounded-xl border border-border/50 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold">Plan:</span>
-                <span className="text-lg">{plan.name}</span>
+                <span className="text-lg font-medium">{plan.name}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold">Billing:</span>
-                <span className="text-lg capitalize">
+                <span className="text-lg capitalize font-medium">
                   {formData.billingCycle}
                 </span>
               </div>
@@ -405,17 +460,18 @@ function SignupPageContent() {
                   <span className="text-lg font-bold">${savings}</span>
                 </div>
               )}
-              <div className="border-t pt-4 flex justify-between items-center">
+              <div className="border-t border-border/50 pt-4 flex justify-between items-center">
                 <span className="text-xl font-bold">Total:</span>
                 <span className="text-2xl font-bold">${price}</span>
               </div>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-4 pt-2">
               <Button
                 variant="outline"
                 onClick={() => setStep("plan")}
-                className="flex-1"
+                className="flex-1 h-11"
+                size="lg"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
@@ -423,7 +479,7 @@ function SignupPageContent() {
               <Button
                 onClick={handleCheckout}
                 disabled={isLoading}
-                className="flex-1"
+                className="flex-1 h-11 text-base font-medium"
                 size="lg"
               >
                 {isLoading ? "Processing..." : "Proceed to Payment"}
@@ -441,17 +497,19 @@ function SignupPageContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-neutral-light p-4">
-        <Card className="w-full max-w-lg">
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Loading...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
+          <Card className="w-full max-w-lg relative z-10 shadow-xl border-border/50">
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
       <SignupPageContent />
     </Suspense>
   );

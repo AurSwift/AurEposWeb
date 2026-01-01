@@ -392,7 +392,7 @@ User Action                    Server Action                    Database
 ### Step 5: Success Page
 ```
 ┌─────────────────────────────────────┐
-│  Welcome to Auraswif! ✅            │
+│  Welcome to aurswift! ✅            │
 ├─────────────────────────────────────┤
 │  Your License Key:                  │
 │  EPOS-PRO-V2-7A83B2D4-E9            │

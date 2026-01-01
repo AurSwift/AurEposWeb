@@ -113,7 +113,7 @@ function SuccessPageContent() {
               </div>
             </div>
             <CardTitle className="text-3xl font-bold">
-              Welcome to Auraswif!
+              Welcome to aurswift!
             </CardTitle>
             <CardDescription className="text-lg">
               Your subscription is active and your license key is ready
@@ -161,7 +161,7 @@ function SuccessPageContent() {
               <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
                 <li>Download and install the EPOS software</li>
                 <li>Enter your license key when prompted</li>
-                <li>Start using Auraswif EPOS!</li>
+                <li>Start using aurswift EPOS!</li>
               </ol>
             </div>
 

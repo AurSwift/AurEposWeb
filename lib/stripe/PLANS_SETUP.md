@@ -1,6 +1,6 @@
 # Stripe Plans Setup Guide
 
-This document explains how to set up plans in Stripe to work with the AuraSwift application.
+This document explains how to set up plans in Stripe to work with the aurswift application.
 
 ## Overview
 

@@ -13,13 +13,13 @@ export function DownloadCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Download the latest version of Auraswif EPOS software for Windows or macOS
+          Download the latest version of aurswift EPOS software for Windows or macOS
         </p>
 
         <div className="space-y-2">
           <Button className="w-full" size="lg">
             <Download className="w-5 h-5 mr-2" />
-            Download Auraswif Software
+            Download aurswift Software
           </Button>
           <p className="text-xs text-center text-muted-foreground">Version 3.2.1 • Released Dec 10, 2024</p>
         </div>

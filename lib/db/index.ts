@@ -14,8 +14,12 @@ function getDb() {
   }
 
   if (!_db) {
-    // Disable prefetch as it is not supported for "Transaction" pool mode
-    _client = postgres(process.env.DATABASE_URL, { prepare: false });
+    // Standard Neon connection configuration
+    // Note: If experiencing cold start timeouts, disable auto-suspend in Neon dashboard
+    // Settings → Compute → "Suspend compute after inactivity" → Set to "Never"
+    _client = postgres(process.env.DATABASE_URL, {
+      prepare: false, // Required for Neon's Transaction pool mode
+    });
     _db = drizzle(_client, { schema });
   }
 

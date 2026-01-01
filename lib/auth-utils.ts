@@ -4,6 +4,7 @@ import { db } from "./db";
 import {
   users,
   passwordResetTokens,
+  verificationTokens,
   customers,
   subscriptions,
   licenseKeys,
@@ -140,6 +141,67 @@ export async function updateUserPassword(
     .update(users)
     .set({
       password: hashedPassword,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.email, email));
+}
+
+// Generate email verification token
+export async function generateVerificationToken(email: string): Promise<string> {
+  // Delete any existing tokens for this email
+  await db
+    .delete(verificationTokens)
+    .where(eq(verificationTokens.identifier, email));
+
+  // Generate new token (32 bytes = 64 hex characters)
+  const token = crypto.randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3 hours from now
+
+  // Store token in database
+  await db.insert(verificationTokens).values({
+    identifier: email,
+    token,
+    expires,
+  });
+
+  return token;
+}
+
+// Verify email verification token
+export async function verifyVerificationToken(
+  token: string
+): Promise<{ email: string } | null> {
+  const result = await db
+    .select()
+    .from(verificationTokens)
+    .where(
+      and(
+        eq(verificationTokens.token, token),
+        gt(verificationTokens.expires, new Date())
+      )
+    )
+    .limit(1);
+
+  if (result.length === 0) {
+    return null;
+  }
+
+  return { email: result[0].identifier };
+}
+
+// Delete email verification token
+export async function deleteVerificationToken(token: string): Promise<void> {
+  await db
+    .delete(verificationTokens)
+    .where(eq(verificationTokens.token, token));
+}
+
+// Verify user email
+export async function verifyUserEmail(email: string): Promise<void> {
+  await db
+    .update(users)
+    .set({
+      emailVerified: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(users.email, email));

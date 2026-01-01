@@ -81,6 +81,38 @@ export async function POST(request: NextRequest) {
     const price =
       billingCycle === "monthly" ? plan.priceMonthly : plan.priceAnnual;
 
+    // Log subscription data for debugging
+    console.log("Stripe subscription data:", {
+      current_period_start: stripeSubscription.current_period_start,
+      current_period_end: stripeSubscription.current_period_end,
+      trial_start: stripeSubscription.trial_start,
+      trial_end: stripeSubscription.trial_end,
+      status: stripeSubscription.status,
+    });
+
+    // Handle trialing subscriptions - use trial dates as period dates
+    const isTrialing = stripeSubscription.status === "trialing";
+    const currentPeriodStart = isTrialing
+      ? stripeSubscription.trial_start!
+      : stripeSubscription.current_period_start;
+    const currentPeriodEnd = isTrialing
+      ? stripeSubscription.trial_end!
+      : stripeSubscription.current_period_end;
+
+    // Validate timestamps before creating dates
+    const validateTimestamp = (
+      timestamp: number | null | undefined,
+      fieldName: string
+    ) => {
+      if (timestamp === null || timestamp === undefined) {
+        throw new Error(`${fieldName} is null or undefined`);
+      }
+      if (isNaN(timestamp) || timestamp <= 0) {
+        throw new Error(`${fieldName} is invalid: ${timestamp}`);
+      }
+      return timestamp;
+    };
+
     // Create subscription
     const [newSubscription] = await db
       .insert(subscriptions)
@@ -90,22 +122,26 @@ export async function POST(request: NextRequest) {
         planType: planId,
         billingCycle,
         price: price.toString(),
-        status:
-          stripeSubscription.status === "trialing" ? "trialing" : "active",
+        status: isTrialing ? "trialing" : "active",
         currentPeriodStart: new Date(
-          (stripeSubscription as any).current_period_start * 1000
+          validateTimestamp(currentPeriodStart, "current_period_start") * 1000
         ),
         currentPeriodEnd: new Date(
-          (stripeSubscription as any).current_period_end * 1000
+          validateTimestamp(currentPeriodEnd, "current_period_end") * 1000
         ),
-        nextBillingDate: new Date((stripeSubscription as any).current_period_end * 1000),
-        trialStart: (stripeSubscription as any).trial_start
-          ? new Date((stripeSubscription as any).trial_start * 1000)
+        nextBillingDate: new Date(
+          validateTimestamp(
+            currentPeriodEnd,
+            "current_period_end (nextBillingDate)"
+          ) * 1000
+        ),
+        trialStart: stripeSubscription.trial_start
+          ? new Date(stripeSubscription.trial_start * 1000)
           : null,
-        trialEnd: (stripeSubscription as any).trial_end
-          ? new Date((stripeSubscription as any).trial_end * 1000)
+        trialEnd: stripeSubscription.trial_end
+          ? new Date(stripeSubscription.trial_end * 1000)
           : null,
-        autoRenew: !(stripeSubscription as any).cancel_at_period_end,
+        autoRenew: !stripeSubscription.cancel_at_period_end,
         stripeSubscriptionId: stripeSubscription.id,
         stripeCustomerId: stripeSubscription.customer as string,
         metadata: {

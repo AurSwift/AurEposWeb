@@ -851,7 +851,7 @@ export default async function SuccessPage({
 
   return (
     <div className="container mx-auto py-12">
-      <h1>Welcome to Auraswif!</h1>
+      <h1>Welcome to aurswift!</h1>
       <LicenseKeyCard licenseKey={licenseKey?.licenseKey} />
       <DownloadButton />
       {/* Activation instructions */}

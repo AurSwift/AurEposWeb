@@ -28,7 +28,7 @@ export function Header() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <span className="text-lg font-bold text-primary-foreground">A</span>
               </div>
-              <span className="text-xl font-bold text-foreground">Auraswif</span>
+              <span className="text-xl font-bold text-foreground">aurswift</span>
             </Link>
             <nav className="hidden md:flex gap-6">
               <a

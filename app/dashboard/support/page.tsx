@@ -109,14 +109,14 @@ export default function SupportPage() {
                 <Mail className="w-4 h-4 text-accent mt-0.5" />
                 <div className="text-sm">
                   <p className="font-semibold text-foreground">Email</p>
-                  <p className="text-muted-foreground">support@auraswif.com</p>
+                  <p className="text-muted-foreground">support@aurswift.com</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Phone className="w-4 h-4 text-accent mt-0.5" />
                 <div className="text-sm">
                   <p className="font-semibold text-foreground">Phone</p>
-                  <p className="text-muted-foreground">1-800-AURASWIF</p>
+                  <p className="text-muted-foreground">1-800-aurswift</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

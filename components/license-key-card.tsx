@@ -27,7 +27,7 @@ export function LicenseKeyCard({ licenseKey }: LicenseKeyCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Use this key to activate your Auraswif software</p>
+        <p className="text-sm text-muted-foreground">Use this key to activate your aurswift software</p>
 
         <div className="bg-neutral-light border border-border rounded-lg p-4">
           <p className="font-mono text-lg font-bold text-center text-foreground tracking-wider">{licenseKey}</p>

@@ -9,7 +9,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { licenseKey, machineIdHash, terminalName, appVersion, location } = body;
+    const { licenseKey, machineIdHash, terminalName, appVersion, location } =
+      body;
 
     // Validate required fields
     if (!licenseKey) {

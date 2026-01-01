@@ -27,7 +27,7 @@ export function DashboardHeader({ companyName }: DashboardHeaderProps) {
               <span className="text-white font-bold text-lg">A</span>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">Auraswif</h1>
+              <h1 className="text-lg font-bold text-foreground">aurswift</h1>
               <p className="text-xs text-muted-foreground">{companyName}</p>
             </div>
           </div>
