@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,10 +51,14 @@ export default function ForgotPasswordPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
-              </div>
-              <CardTitle className="text-2xl font-bold">aurswift</CardTitle>
+              <Image
+                src="/logo.png"
+                alt="Aurswift Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-cover"
+              />
+              <CardTitle className="text-2xl font-bold">Aurswift</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

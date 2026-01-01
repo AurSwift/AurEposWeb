@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -23,11 +24,16 @@ export function DashboardHeader({ companyName }: DashboardHeaderProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <span className="text-white font-bold text-lg">A</span>
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Aurswift Logo"
+              width={32}
+              height={32}
+              className="h-8 w-8 object-cover"
+              priority
+            />
             <div>
-              <h1 className="text-lg font-bold text-foreground">aurswift</h1>
+              <h1 className="text-lg font-bold text-foreground">Aurswift</h1>
               <p className="text-xs text-muted-foreground">{companyName}</p>
             </div>
           </div>

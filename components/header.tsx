@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
   const pathname = usePathname();
 
-  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, hash: string) => {
+  const handleAnchorClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    hash: string
+  ) => {
     // If we're on the home page, use smooth scroll
     if (pathname === "/") {
       e.preventDefault();
@@ -25,10 +29,17 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-lg font-bold text-primary-foreground">A</span>
-              </div>
-              <span className="text-xl font-bold text-foreground">aurswift</span>
+              <Image
+                src="/logo.png"
+                alt="Aurswift Logo"
+                width={60}
+                height={48}
+                className="h-12 w-15 object-cover"
+                priority
+              />
+              <span className="text-xl font-bold text-foreground">
+                Aurswift
+              </span>
             </Link>
             <nav className="hidden md:flex gap-6">
               <a

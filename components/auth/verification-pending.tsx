@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -81,11 +82,16 @@ export function VerificationPending({ email }: VerificationPendingProps) {
     <Card className="w-full max-w-lg shadow-xl border-border/50 backdrop-blur-sm">
       <CardHeader className="space-y-1 text-center pb-6">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-            <span className="text-primary-foreground font-bold text-xl">A</span>
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Aurswift Logo"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-cover"
+            priority
+          />
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            aurswift
+            Aurswift
           </CardTitle>
         </div>
         <CardDescription className="text-base">

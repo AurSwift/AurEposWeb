@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -92,9 +93,13 @@ function ResetPasswordForm() {
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
-              </div>
+              <Image
+                src="/logo.png"
+                alt="Aurswift Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-cover"
+              />
               <CardTitle className="text-2xl font-bold">
                 Invalid Token
               </CardTitle>
@@ -132,9 +137,13 @@ function ResetPasswordForm() {
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
-              </div>
+              <Image
+                src="/logo.png"
+                alt="Aurswift Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-cover"
+              />
               <CardTitle className="text-2xl font-bold">
                 Password Reset
               </CardTitle>

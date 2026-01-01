@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -81,10 +82,14 @@ export function Footer() {
           </div>
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-lg font-bold text-primary-foreground">A</span>
-              </div>
-              <span className="font-bold text-foreground">aurswift</span>
+              <Image
+                src="/logo.png"
+                alt="Aurswift Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-cover"
+              />
+              <span className="font-bold text-foreground">Aurswift</span>
             </div>
             <p className="text-sm text-muted-foreground">Smart Commerce, Simplified.</p>
           </div>
