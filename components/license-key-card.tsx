@@ -11,11 +11,14 @@ interface LicenseKeyCardProps {
 
 export function LicenseKeyCard({ licenseKey }: LicenseKeyCardProps) {
   const [copied, setCopied] = useState(false)
+  const hasLicenseKey = licenseKey && licenseKey !== "Not Assigned"
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(licenseKey)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (hasLicenseKey) {
+      navigator.clipboard.writeText(licenseKey)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   return (
@@ -27,25 +30,33 @@ export function LicenseKeyCard({ licenseKey }: LicenseKeyCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Use this key to activate your aurswift software</p>
+        <p className="text-sm text-muted-foreground">
+          {hasLicenseKey 
+            ? "Use this key to activate your aurswift software"
+            : "Your license key will be assigned after you subscribe to a plan"}
+        </p>
 
         <div className="bg-neutral-light border border-border rounded-lg p-4">
-          <p className="font-mono text-lg font-bold text-center text-foreground tracking-wider">{licenseKey}</p>
+          <p className="font-mono text-lg font-bold text-center text-foreground tracking-wider">
+            {licenseKey}
+          </p>
         </div>
 
-        <Button onClick={handleCopy} variant="outline" className="w-full bg-transparent">
-          {copied ? (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              Copied!
-            </>
-          ) : (
-            <>
-              <Copy className="w-4 h-4 mr-2" />
-              Copy License Key
-            </>
-          )}
-        </Button>
+        {hasLicenseKey && (
+          <Button onClick={handleCopy} variant="outline" className="w-full bg-transparent">
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy License Key
+              </>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )

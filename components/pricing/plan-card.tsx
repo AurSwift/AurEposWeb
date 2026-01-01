@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -10,13 +11,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
-import type { Plan } from "@/lib/stripe/plans";
+import { BillingToggle } from "./billing-toggle";
+import type { Plan, BillingCycle, PlanId } from "@/lib/stripe/plans";
 
 interface PlanCardProps {
   plan: Plan;
   billingCycle: "monthly" | "annual";
-  onSelect: () => void;
+  onSelect: (planId: PlanId, cycle: BillingCycle) => void;
   isSelected?: boolean;
+  selectedBillingCycle?: BillingCycle | null;
 }
 
 export function PlanCard({
@@ -24,19 +27,49 @@ export function PlanCard({
   billingCycle,
   onSelect,
   isSelected,
+  selectedBillingCycle,
 }: PlanCardProps) {
+  const [localBillingCycle, setLocalBillingCycle] =
+    useState<BillingCycle>(billingCycle);
+
+  // Sync local billing cycle with global when plan is selected
+  useEffect(() => {
+    if (isSelected && selectedBillingCycle) {
+      setLocalBillingCycle(selectedBillingCycle);
+    }
+  }, [isSelected, selectedBillingCycle]);
+
+  // Sync with global billing cycle when it changes (for initial state)
+  useEffect(() => {
+    setLocalBillingCycle(billingCycle);
+  }, [billingCycle]);
+
+  const isThisPlanSelected = isSelected && selectedBillingCycle === localBillingCycle;
+
   const price =
-    billingCycle === "monthly" ? plan.priceMonthly : plan.priceAnnual;
+    localBillingCycle === "monthly" ? plan.priceMonthly : plan.priceAnnual;
   const savings =
-    billingCycle === "annual"
+    localBillingCycle === "annual"
       ? plan.priceMonthly * 12 - plan.priceAnnual
       : 0;
 
+  const handleBillingCycleChange = (cycle: BillingCycle) => {
+    setLocalBillingCycle(cycle);
+    // Auto-select plan when billing cycle changes if this plan is already selected
+    if (isSelected) {
+      onSelect(plan.id, cycle);
+    }
+  };
+
+  const handleSelect = () => {
+    onSelect(plan.id, localBillingCycle);
+  };
+
   return (
     <Card
-      className={`relative ${isSelected ? "border-primary border-2" : ""} ${
-        plan.popular ? "border-accent" : ""
-      }`}
+      className={`relative transition-all ${
+        isThisPlanSelected ? "border-primary border-2 shadow-lg" : ""
+      } ${plan.popular ? "border-accent" : ""}`}
     >
       {plan.popular && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -49,7 +82,7 @@ export function PlanCard({
         <div className="mt-4">
           <span className="text-4xl font-bold">${price}</span>
           <span className="text-muted-foreground">
-            /{billingCycle === "monthly" ? "month" : "year"}
+            /{localBillingCycle === "monthly" ? "month" : "year"}
           </span>
           {savings > 0 && (
             <p className="text-sm text-green-600 dark:text-green-400 mt-1">
@@ -58,8 +91,12 @@ export function PlanCard({
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-2 mb-6">
+      <CardContent className="space-y-4">
+        <BillingToggle
+          billingCycle={localBillingCycle}
+          onCycleChange={handleBillingCycleChange}
+        />
+        <ul className="space-y-2">
           {plan.features.features.map((feature, idx) => (
             <li key={idx} className="flex items-start gap-2">
               <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -68,11 +105,11 @@ export function PlanCard({
           ))}
         </ul>
         <Button
-          onClick={onSelect}
+          onClick={handleSelect}
           className="w-full"
-          variant={plan.popular || isSelected ? "default" : "outline"}
+          variant={plan.popular || isThisPlanSelected ? "default" : "outline"}
         >
-          Select Plan
+          {isThisPlanSelected ? "Selected" : "Select Plan"}
         </Button>
       </CardContent>
     </Card>

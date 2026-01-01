@@ -66,12 +66,10 @@ function VerifyEmailContent() {
       setEmail(data.email);
       setStatus("success");
 
-      // Auto-login the user after successful verification
-      // We need to get the user's password, but we don't have it here
-      // Instead, we'll redirect to login with a success message
-      // Or we can use a magic link approach, but for now, redirect to login
+      // Redirect to plan selection after email verification
+      // In a real-world EPOS flow, users should select a plan before accessing the dashboard
       setTimeout(() => {
-        router.push("/login?verified=true");
+        router.push("/signup?step=plan&verified=true");
       }, 2000);
     } catch (err) {
       console.error("Verification error:", err);
@@ -202,7 +200,8 @@ function VerifyEmailContent() {
               <AlertDescription className="text-sm text-green-800 dark:text-green-200">
                 <strong>Email verified successfully!</strong>
                 <br />
-                Your email address has been verified. Redirecting to login...
+                Your email address has been verified. Redirecting to plan
+                selection...
               </AlertDescription>
             </Alert>
           </CardContent>

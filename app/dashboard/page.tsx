@@ -68,7 +68,7 @@ export default async function DashboardPage() {
         status:
           (subscription.status || "Inactive").charAt(0).toUpperCase() +
           (subscription.status || "inactive").slice(1),
-        nextBillingDate: subscription.nextBillingDate || new Date(),
+        nextBillingDate: subscription.nextBillingDate || null,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd || false,
         trialEnd: subscription.trialEnd,
         price: subscription.price || undefined,
@@ -77,14 +77,41 @@ export default async function DashboardPage() {
     : {
         plan: "No Active Plan",
         status: "Inactive",
-        nextBillingDate: new Date(),
+        nextBillingDate: null,
       };
+
+  const hasActiveSubscription =
+    subscription &&
+    (subscription.status === "active" || subscription.status === "trialing");
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <WelcomeBanner
         companyName={customer.companyName || session.user.name || "User"}
       />
+
+      {/* Show call-to-action if no active subscription */}
+      {!hasActiveSubscription && (
+        <div className="mt-6 p-6 bg-primary/10 border border-primary/20 rounded-lg">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">
+                Get Started with Your AurEPOS
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Select a subscription plan to activate your license and begin
+                using the software.
+              </p>
+            </div>
+            <a
+              href="/pricing"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium whitespace-nowrap"
+            >
+              Select a Plan
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <SubscriptionCard subscription={subscriptionData} />

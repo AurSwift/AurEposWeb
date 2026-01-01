@@ -10,7 +10,7 @@ interface SubscriptionCardProps {
     planId?: string
     plan: string
     status: string
-    nextBillingDate: string | Date
+    nextBillingDate: string | Date | null
     cancelAtPeriodEnd?: boolean
     trialEnd?: string | Date | null
     price?: string
@@ -19,8 +19,10 @@ interface SubscriptionCardProps {
 }
 
 export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
-  const nextBillingDate = subscription.nextBillingDate ? new Date(subscription.nextBillingDate) : new Date();
-  const formattedDate = format(nextBillingDate, "MMM dd, yyyy");
+  const hasActiveSubscription = subscription.status.toLowerCase() === "active" || 
+    subscription.status.toLowerCase() === "trialing";
+  const nextBillingDate = subscription.nextBillingDate ? new Date(subscription.nextBillingDate) : null;
+  const formattedDate = nextBillingDate ? format(nextBillingDate, "MMM dd, yyyy") : null;
   
   const getPlanIcon = (planName: string) => {
     const normalized = planName.toLowerCase();
@@ -83,21 +85,25 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
            </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2 border-t border-border mt-auto">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground">
-              {subscription.cancelAtPeriodEnd ? "Access until" : "Next billing"}
-            </p>
-            <p className="text-sm font-medium">{formattedDate}</p>
+        {hasActiveSubscription && formattedDate && (
+          <div className="flex items-center gap-2 pt-2 border-t border-border mt-auto">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground">
+                {subscription.cancelAtPeriodEnd ? "Access until" : "Next billing"}
+              </p>
+              <p className="text-sm font-medium">{formattedDate}</p>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
-      <CardFooter>
-        <Button variant="outline" className="w-full" asChild>
-          <Link href="/dashboard/subscription">Manage Subscription</Link>
-        </Button>
-      </CardFooter>
+      {hasActiveSubscription && (
+        <CardFooter>
+          <Button variant="outline" className="w-full" asChild>
+            <Link href="/dashboard/subscription">Manage Subscription</Link>
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   )
 }

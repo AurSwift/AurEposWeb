@@ -3,10 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === "authenticated";
 
   const handleAnchorClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -21,6 +24,10 @@ export function Header() {
       }
     }
     // Otherwise, navigate to home page with hash
+  };
+
+  const handleLogout = async () => {
+    await signOut({ redirect: true, callbackUrl: "/" });
   };
 
   return (
@@ -42,35 +49,76 @@ export function Header() {
               </span>
             </Link>
             <nav className="hidden md:flex gap-6">
-              <a
-                href="#features"
-                onClick={(e) => handleAnchorClick(e, "#features")}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Features
-              </a>
-              <a
-                href="#pricing"
-                onClick={(e) => handleAnchorClick(e, "#pricing")}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Pricing
-              </a>
-              <Link
-                href="/contact"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Contact
-              </Link>
+              {pathname === "/" ? (
+                <>
+                  <a
+                    href="#features"
+                    onClick={(e) => handleAnchorClick(e, "#features")}
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    Features
+                  </a>
+                  <Link
+                    href="/pricing"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Pricing
+                  </Link>
+                  <Link
+                    href="/contact"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Contact
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/#features"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Features
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Pricing
+                  </Link>
+                  <Link
+                    href="/contact"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Contact
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild className="hidden sm:inline-flex">
-              <Link href="/login">Log in</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/signup">Get Started</Link>
-            </Button>
+            {isAuthenticated ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  asChild 
+                  className="hidden sm:inline-flex border border-border bg-background shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <Link href="/dashboard">Go to Dashboard</Link>
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" asChild className="hidden sm:inline-flex">
+                  <Link href="/login">Log in</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/signup">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

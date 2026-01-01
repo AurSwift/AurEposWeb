@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { PlanCard } from "@/components/pricing/plan-card";
 import { BillingToggle } from "@/components/pricing/billing-toggle";
 import { type PlanId, type BillingCycle, type Plan } from "@/lib/stripe/plans";
@@ -49,6 +49,7 @@ function SignupPageContent() {
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
 
   // Fetch plans from API
   useEffect(() => {
@@ -77,6 +78,18 @@ function SignupPageContent() {
       setFormData((prev) => ({ ...prev, planId: plan }));
       setStep("plan");
       setError("Checkout was canceled. Please try again.");
+      return;
+    }
+
+    // Check if user was redirected after email verification
+    const stepParam = searchParams?.get("step");
+    const verified = searchParams?.get("verified");
+    if (stepParam === "plan" && verified === "true") {
+      setStep("plan");
+      setShowVerificationSuccess(true);
+      setError(""); // Clear any errors
+      // Hide success message after 5 seconds
+      setTimeout(() => setShowVerificationSuccess(false), 5000);
     }
   }, [searchParams]);
 
@@ -345,6 +358,16 @@ function SignupPageContent() {
               Select the plan that best fits your business needs
             </p>
           </div>
+
+          {showVerificationSuccess && (
+            <Alert className="mb-8 max-w-2xl mx-auto animate-in fade-in-50 bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-sm text-green-800 dark:text-green-200">
+                <strong>Email verified successfully!</strong> Please select a
+                plan to continue.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {error && (
             <Alert

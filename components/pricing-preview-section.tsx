@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,6 +28,8 @@ interface Plan {
 }
 
 export function PricingPreviewSection() {
+  const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(
     "monthly"
@@ -178,7 +181,11 @@ export function PricingPreviewSection() {
                     asChild
                   >
                     <Link
-                      href={`/signup?plan=${plan.id}&cycle=${billingCycle}`}
+                      href={
+                        isAuthenticated
+                          ? `/pricing?plan=${plan.id}&cycle=${billingCycle}`
+                          : `/signup?plan=${plan.id}&cycle=${billingCycle}`
+                      }
                     >
                       Select Plan
                     </Link>
