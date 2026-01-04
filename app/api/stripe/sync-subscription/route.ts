@@ -65,17 +65,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const stripeSubscription = await stripe.subscriptions.retrieve(
+      subscriptionId
+    );
 
-    // Access subscription properties with type safety
-    // These properties exist on Stripe.Subscription but may not be in the type definition
-    const currentPeriodStart = (stripeSubscription as any).current_period_start as number | null | undefined;
-    const currentPeriodEnd = (stripeSubscription as any).current_period_end as number | null | undefined;
-    const trialStart = stripeSubscription.trial_start as number | null | undefined;
-    const trialEnd = stripeSubscription.trial_end as number | null | undefined;
+    // Access subscription properties - they exist natively on Stripe.Subscription
+    const currentPeriodStart = stripeSubscription.current_period_start;
+    const currentPeriodEnd = stripeSubscription.current_period_end;
+    const trialStart = stripeSubscription.trial_start;
+    const trialEnd = stripeSubscription.trial_end;
 
-    // Type guard to ensure we have the required properties
-    if (!currentPeriodStart || !currentPeriodEnd) {
+    // Handle trialing subscriptions - use trial dates as period dates
+    const isTrialing = stripeSubscription.status === "trialing";
+    const periodStart = isTrialing
+      ? trialStart ?? currentPeriodStart
+      : currentPeriodStart;
+    const periodEnd = isTrialing
+      ? trialEnd ?? currentPeriodEnd
+      : currentPeriodEnd;
+
+    // Type guard to ensure we have the required properties (after fallback logic)
+    if (!periodStart || !periodEnd) {
+      console.error("Missing period dates:", {
+        currentPeriodStart,
+        currentPeriodEnd,
+        trialStart,
+        trialEnd,
+        periodStart,
+        periodEnd,
+        subscriptionId: stripeSubscription.id,
+        status: stripeSubscription.status,
+      });
       return NextResponse.json(
         { error: "Subscription missing required period dates" },
         { status: 400 }
@@ -111,17 +131,10 @@ export async function POST(request: NextRequest) {
       current_period_end: currentPeriodEnd,
       trial_start: trialStart ?? null,
       trial_end: trialEnd ?? null,
+      periodStart,
+      periodEnd,
       status: stripeSubscription.status,
     });
-
-    // Handle trialing subscriptions - use trial dates as period dates
-    const isTrialing = stripeSubscription.status === "trialing";
-    const periodStart = isTrialing
-      ? (trialStart ?? currentPeriodStart)
-      : currentPeriodStart;
-    const periodEnd = isTrialing
-      ? (trialEnd ?? currentPeriodEnd)
-      : currentPeriodEnd;
 
     // Validate timestamps before creating dates
     const validateTimestamp = (
@@ -154,17 +167,11 @@ export async function POST(request: NextRequest) {
           validateTimestamp(periodEnd, "current_period_end") * 1000
         ),
         nextBillingDate: new Date(
-          validateTimestamp(
-            periodEnd,
-            "current_period_end (nextBillingDate)"
-          ) * 1000
+          validateTimestamp(periodEnd, "current_period_end (nextBillingDate)") *
+            1000
         ),
-        trialStart: trialStart
-          ? new Date(trialStart * 1000)
-          : null,
-        trialEnd: trialEnd
-          ? new Date(trialEnd * 1000)
-          : null,
+        trialStart: trialStart ? new Date(trialStart * 1000) : null,
+        trialEnd: trialEnd ? new Date(trialEnd * 1000) : null,
         autoRenew: !stripeSubscription.cancel_at_period_end,
         stripeSubscriptionId: stripeSubscription.id,
         stripeCustomerId: stripeSubscription.customer as string,

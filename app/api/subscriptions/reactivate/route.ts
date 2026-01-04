@@ -4,6 +4,10 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { subscriptions, customers, subscriptionChanges } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  publishSubscriptionReactivated,
+  getLicenseKeysForSubscription,
+} from "@/lib/subscription-events";
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,6 +96,16 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    // 🔔 SSE: Notify desktop apps about reactivation (after transaction commits)
+    const licenseKeysList = await getLicenseKeysForSubscription(subscriptionId);
+
+    for (const key of licenseKeysList) {
+      publishSubscriptionReactivated(key, {
+        subscriptionStatus: "active",
+        planId: subscription.planId || "basic",
+      });
+    }
 
     return NextResponse.json({
       success: true,

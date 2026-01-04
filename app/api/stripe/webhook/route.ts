@@ -8,7 +8,7 @@ import {
   webhookEvents,
   subscriptionChanges,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { generateLicenseKey, storeLicenseKey } from "@/lib/license/generator";
 import { getPlan, type PlanId } from "@/lib/stripe/plans";
 import {
@@ -16,6 +16,77 @@ import {
   createPaymentFromInvoice,
 } from "@/lib/db/payment-helpers";
 import Stripe from "stripe";
+
+// SSE Event Publisher for real-time desktop notifications
+import {
+  getLicenseKeysForSubscription,
+  publishSubscriptionCancelled,
+  publishSubscriptionReactivated,
+  publishSubscriptionUpdated,
+  publishSubscriptionPastDue,
+  publishPaymentSucceeded,
+  publishLicenseReactivated,
+} from "@/lib/subscription-events";
+import { getPlanFeatures } from "@/lib/license/validator";
+
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+// ============================================================================
+// TYPE DEFINITIONS FOR STRIPE WEBHOOK DATA
+// ============================================================================
+
+/**
+ * Checkout session with required metadata
+ */
+interface CheckoutSessionData {
+  id: string;
+  metadata?: {
+    customerId?: string;
+    planId?: string;
+    billingCycle?: "monthly" | "annual";
+  };
+  subscription?: string;
+  payment_intent?: string;
+}
+
+/**
+ * Stripe subscription object
+ */
+interface StripeSubscriptionData {
+  id: string;
+  status: Stripe.Subscription.Status;
+  customer: string | Stripe.Customer | Stripe.DeletedCustomer;
+  current_period_start: number;
+  current_period_end: number;
+  cancel_at_period_end: boolean;
+  canceled_at: number | null;
+  trial_start: number | null;
+  trial_end: number | null;
+  latest_invoice?: string | Stripe.Invoice | null;
+  items: {
+    data: Array<{
+      price: {
+        id: string;
+      };
+    }>;
+  };
+}
+
+/**
+ * Stripe invoice object
+ */
+interface StripeInvoiceData {
+  id: string;
+  subscription?: string | null;
+  amount_paid: number;
+  amount_due: number;
+  currency: string;
+  status?: Stripe.Invoice.Status | null;
+  payment_intent?: string | Stripe.PaymentIntent | null;
+  hosted_invoice_url?: string | null;
+  period_start: number;
+  period_end: number;
+}
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -35,31 +106,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Idempotency check
+  // =========================================================================
+  // IDEMPOTENCY CHECK WITH PROPER CONFLICT HANDLING
+  // Uses ON CONFLICT DO NOTHING to atomically check and insert
+  // =========================================================================
   try {
-    const [existingEvent] = await db
-      .select()
-      .from(webhookEvents)
-      .where(eq(webhookEvents.stripeEventId, event.id))
-      .limit(1);
+    // Try to insert the event - if it already exists, this will return empty array
+    const [insertedEvent] = await db
+      .insert(webhookEvents)
+      .values({
+        stripeEventId: event.id,
+        eventType: event.type,
+        metadata: event.data.object as Record<string, unknown>,
+        processed: false, // Will be set to true after successful processing
+      })
+      .onConflictDoNothing({ target: webhookEvents.stripeEventId })
+      .returning();
 
-    if (existingEvent) {
-      console.log(`Webhook event ${event.id} already processed`);
+    if (!insertedEvent) {
+      // Event was already processed (conflict on insert)
+      console.log(
+        `Webhook event ${event.id} already processed (idempotent skip)`
+      );
       return NextResponse.json({ received: true });
     }
-
-    // Record event processing start
-    await db.insert(webhookEvents).values({
-      stripeEventId: event.id,
-      eventType: event.type,
-      metadata: event.data.object as any,
-      processed: true,
-    });
   } catch (error) {
-    console.warn(
-      "Idempotency check failed (possibly duplicate insert):",
-      error
-    );
+    console.warn("Idempotency check failed:", error);
     // Continue processing - better to process twice than not at all if DB is flaky
   }
 
@@ -68,32 +140,32 @@ export async function POST(request: NextRequest) {
 
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as any;
+        const session = event.data.object as CheckoutSessionData;
         await handleCheckoutCompleted(session);
         break;
       }
 
       case "customer.subscription.created":
       case "customer.subscription.updated": {
-        const subscription = event.data.object as any;
+        const subscription = event.data.object as StripeSubscriptionData;
         await handleSubscriptionUpdated(subscription);
         break;
       }
 
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as any;
+        const subscription = event.data.object as StripeSubscriptionData;
         await handleSubscriptionDeleted(subscription);
         break;
       }
 
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as any;
+        const invoice = event.data.object as StripeInvoiceData;
         await handlePaymentSucceeded(invoice);
         break;
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as any;
+        const invoice = event.data.object as StripeInvoiceData;
         await handlePaymentFailed(invoice);
         break;
       }
@@ -102,9 +174,37 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    // Mark event as successfully processed
+    try {
+      await db
+        .update(webhookEvents)
+        .set({ processed: true })
+        .where(eq(webhookEvents.stripeEventId, event.id));
+    } catch {
+      // Non-critical - event was already processed successfully
+    }
+
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error(`Webhook handler failed for ${event.type}:`, error);
+
+    // Mark event as failed (for retry tracking)
+    try {
+      await db
+        .update(webhookEvents)
+        .set({
+          processed: false,
+          metadata: sql`${
+            webhookEvents.metadata
+          } || jsonb_build_object('error', ${String(
+            error
+          )}, 'failedAt', ${new Date().toISOString()})`,
+        })
+        .where(eq(webhookEvents.stripeEventId, event.id));
+    } catch {
+      // Non-critical
+    }
+
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }
@@ -112,10 +212,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCheckoutCompleted(session: any) {
+async function handleCheckoutCompleted(session: CheckoutSessionData) {
   const customerId = session.metadata?.customerId;
-  const planId = session.metadata?.planId as PlanId;
-  const billingCycle = session.metadata?.billingCycle as "monthly" | "annual";
+  const planId = session.metadata?.planId as PlanId | undefined;
+  const billingCycle = session.metadata?.billingCycle;
 
   if (!customerId || !planId || !billingCycle) {
     console.warn("Missing metadata in checkout session, skipping fulfillment");
@@ -123,14 +223,14 @@ async function handleCheckoutCompleted(session: any) {
   }
 
   // Get subscription from Stripe
-  const subscriptionId = session.subscription as string;
+  const subscriptionId = session.subscription;
   if (!subscriptionId) {
     throw new Error("No subscription ID in checkout session");
   }
 
   const stripeSubscription = (await stripe.subscriptions.retrieve(
     subscriptionId
-  )) as any;
+  )) as StripeSubscriptionData;
 
   // Get customer
   const [customer] = await db
@@ -219,12 +319,12 @@ async function handleCheckoutCompleted(session: any) {
       if (latestInvoiceId && typeof latestInvoiceId === "string") {
         const invoice = (await stripe.invoices.retrieve(
           latestInvoiceId
-        )) as any;
+        )) as StripeInvoiceData;
         // Check if invoice is paid and has payment intent
         const paymentIntentId =
           typeof invoice.payment_intent === "string"
             ? invoice.payment_intent
-            : invoice.payment_intent?.id || null;
+            : (invoice.payment_intent as { id?: string } | null)?.id || null;
         if (invoice.status === "paid" && paymentIntentId) {
           // Invoice is already paid - create payment record now
           await createPaymentFromInvoice(
@@ -278,7 +378,7 @@ async function handleCheckoutCompleted(session: any) {
   );
 }
 
-async function handleSubscriptionUpdated(subscription: any) {
+async function handleSubscriptionUpdated(subscription: StripeSubscriptionData) {
   const stripeSubscriptionId = subscription.id;
 
   // Find subscription by Stripe ID
@@ -293,18 +393,21 @@ async function handleSubscriptionUpdated(subscription: any) {
   const previousStatus = existingSubscription.status;
   const newStatus = subscription.status;
 
+  // Determine internal status
+  const internalStatus =
+    subscription.status === "active"
+      ? "active"
+      : subscription.status === "trialing"
+      ? "trialing"
+      : subscription.status === "past_due"
+      ? "past_due"
+      : "cancelled";
+
   // Update subscription
   await db
     .update(subscriptions)
     .set({
-      status:
-        subscription.status === "active"
-          ? "active"
-          : subscription.status === "trialing"
-          ? "trialing"
-          : subscription.status === "past_due"
-          ? "past_due"
-          : "cancelled",
+      status: internalStatus,
       currentPeriodStart: new Date(subscription.current_period_start * 1000),
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
       nextBillingDate: new Date(subscription.current_period_end * 1000),
@@ -316,7 +419,72 @@ async function handleSubscriptionUpdated(subscription: any) {
     })
     .where(eq(subscriptions.id, existingSubscription.id));
 
-  // If status changed to past_due or canceled, log it
+  // =========================================================================
+  // LICENSE REACTIVATION: Restore licenses when subscription becomes active again
+  // This handles scenarios like:
+  // - Customer uncancels subscription before it expires
+  // - Past due subscription becomes active after payment
+  // - Subscription resumed after being cancelled
+  // =========================================================================
+  const wasInactive = ["cancelled", "past_due"].includes(previousStatus);
+  const isNowActive = ["active", "trialing"].includes(newStatus);
+
+  if (wasInactive && isNowActive) {
+    // Reactivate previously revoked licenses
+    const reactivatedLicenses = await db
+      .update(licenseKeys)
+      .set({
+        isActive: true,
+        revokedAt: null,
+        revocationReason: null,
+        // Note: Keep the existing activation count and deactivation tracking
+      })
+      .where(
+        and(
+          eq(licenseKeys.subscriptionId, existingSubscription.id),
+          eq(licenseKeys.isActive, false)
+        )
+      )
+      .returning();
+
+    if (reactivatedLicenses.length > 0) {
+      console.log(
+        `✅ Reactivated ${reactivatedLicenses.length} license(s) for subscription ${existingSubscription.id}`
+      );
+
+      // Log reactivation
+      await db.insert(subscriptionChanges).values({
+        subscriptionId: existingSubscription.id,
+        customerId: existingSubscription.customerId,
+        changeType: "license_reactivated",
+        reason: `Subscription restored from ${previousStatus} to ${newStatus}`,
+        effectiveDate: new Date(),
+        createdAt: new Date(),
+        metadata: {
+          previousStatus,
+          newStatus,
+          reactivatedLicenseCount: reactivatedLicenses.length,
+          licenseKeys: reactivatedLicenses.map((l) => l.id),
+        },
+      });
+
+      // 🔔 SSE: Notify desktop apps about license reactivation
+      for (const license of reactivatedLicenses) {
+        const planId = license.licenseKey.includes("-BAS-")
+          ? "basic"
+          : license.licenseKey.includes("-PRO-")
+          ? "professional"
+          : "enterprise";
+
+        publishLicenseReactivated(license.licenseKey, {
+          planId,
+          features: getPlanFeatures(planId),
+        });
+      }
+    }
+  }
+
+  // If status changed, log it
   if (previousStatus !== newStatus) {
     await db.insert(subscriptionChanges).values({
       subscriptionId: existingSubscription.id,
@@ -327,10 +495,29 @@ async function handleSubscriptionUpdated(subscription: any) {
       createdAt: new Date(),
       metadata: { previousStatus, newStatus },
     });
+
+    // 🔔 SSE: Notify desktop apps about status change
+    const licenseKeysList = await getLicenseKeysForSubscription(
+      existingSubscription.id
+    );
+
+    const shouldDisable = ["cancelled", "past_due"].includes(internalStatus);
+    const gracePeriodRemaining = shouldDisable
+      ? (internalStatus === "cancelled" ? 7 : 3) * 24 * 60 * 60 * 1000
+      : null;
+
+    for (const licenseKey of licenseKeysList) {
+      publishSubscriptionUpdated(licenseKey, {
+        previousStatus: previousStatus || "unknown",
+        newStatus: internalStatus,
+        shouldDisable,
+        gracePeriodRemaining,
+      });
+    }
   }
 }
 
-async function handleSubscriptionDeleted(subscription: any) {
+async function handleSubscriptionDeleted(subscription: StripeSubscriptionData) {
   const stripeSubscriptionId = subscription.id;
 
   // Find subscription
@@ -352,6 +539,12 @@ async function handleSubscriptionDeleted(subscription: any) {
     })
     .where(eq(subscriptions.id, existingSubscription.id));
 
+  // Get license keys before revoking (for SSE notification)
+  const licensesToRevoke = await db
+    .select({ licenseKey: licenseKeys.licenseKey })
+    .from(licenseKeys)
+    .where(eq(licenseKeys.subscriptionId, existingSubscription.id));
+
   // Revoke license keys
   await db
     .update(licenseKeys)
@@ -371,10 +564,22 @@ async function handleSubscriptionDeleted(subscription: any) {
     effectiveDate: new Date(),
     createdAt: new Date(),
   });
+
+  // 🔔 SSE: Notify desktop apps about subscription cancellation
+  const gracePeriodEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days grace
+
+  for (const license of licensesToRevoke) {
+    publishSubscriptionCancelled(license.licenseKey, {
+      cancelledAt: new Date(),
+      cancelImmediately: true,
+      gracePeriodEnd,
+      reason: "Subscription deleted in Stripe",
+    });
+  }
 }
 
-async function handlePaymentSucceeded(invoice: any) {
-  const subscriptionId = invoice.subscription as string;
+async function handlePaymentSucceeded(invoice: StripeInvoiceData) {
+  const subscriptionId = invoice.subscription;
   if (!subscriptionId) return;
 
   // Find subscription
@@ -385,6 +590,8 @@ async function handlePaymentSucceeded(invoice: any) {
     .limit(1);
 
   if (!subscription) return;
+
+  const previousStatus = subscription.status;
 
   // Update subscription to active
   await db
@@ -402,10 +609,31 @@ async function handlePaymentSucceeded(invoice: any) {
     invoice,
     "completed"
   );
+
+  // 🔔 SSE: Notify desktop apps if status changed from past_due to active
+  if (previousStatus === "past_due") {
+    const licenseKeysList = await getLicenseKeysForSubscription(
+      subscription.id
+    );
+
+    for (const licenseKey of licenseKeysList) {
+      publishPaymentSucceeded(licenseKey, {
+        amount: invoice.amount_paid,
+        currency: invoice.currency.toUpperCase(),
+        subscriptionStatus: "active",
+      });
+
+      // Also send subscription reactivated event
+      publishSubscriptionReactivated(licenseKey, {
+        subscriptionStatus: "active",
+        planId: subscription.planId || "basic",
+      });
+    }
+  }
 }
 
-async function handlePaymentFailed(invoice: any) {
-  const subscriptionId = invoice.subscription as string;
+async function handlePaymentFailed(invoice: StripeInvoiceData) {
+  const subscriptionId = invoice.subscription;
   if (!subscriptionId) return;
 
   const [subscription] = await db
@@ -443,4 +671,19 @@ async function handlePaymentFailed(invoice: any) {
     createdAt: new Date(),
     metadata: { invoiceId: invoice.id },
   });
+
+  // 🔔 SSE: Notify desktop apps about payment failure / past due status
+  const licenseKeysList = await getLicenseKeysForSubscription(subscription.id);
+  const pastDueGracePeriodEnd = new Date(
+    Date.now() + 3 * 24 * 60 * 60 * 1000 // 3 days grace for past_due
+  );
+
+  for (const licenseKey of licenseKeysList) {
+    publishSubscriptionPastDue(licenseKey, {
+      pastDueSince: new Date(),
+      gracePeriodEnd: pastDueGracePeriodEnd,
+      amountDue: invoice.amount_due,
+      currency: invoice.currency.toUpperCase(),
+    });
+  }
 }

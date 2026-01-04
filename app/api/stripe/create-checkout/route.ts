@@ -4,20 +4,17 @@ import { authOptions } from "@/auth";
 import { stripe } from "@/lib/stripe/client";
 import { getStripePriceId, getPlan } from "@/lib/stripe/plans";
 import { db } from "@/lib/db";
-import { customers } from "@/lib/db/schema";
+import { customers, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { PlanId, BillingCycle } from "@/lib/stripe/plans";
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { planId, billingCycle } = (await request.json()) as {
+    const { planId, billingCycle, email } = (await request.json()) as {
       planId: PlanId;
       billingCycle: BillingCycle;
+      email?: string;
     };
 
     if (!planId || !billingCycle) {
@@ -32,17 +29,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid plan ID" }, { status: 400 });
     }
 
-    // Get customer record
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
+    let customer;
+    let userId: string;
 
-    if (!customer) {
+    // If user is authenticated, use their session
+    if (session?.user?.id) {
+      userId = session.user.id;
+      const [customerRecord] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.userId, userId))
+        .limit(1);
+
+      if (!customerRecord) {
+        return NextResponse.json(
+          { error: "Customer not found" },
+          { status: 404 }
+        );
+      }
+      customer = customerRecord;
+    } else if (email) {
+      // If not authenticated but email provided, verify email is verified and get user
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (!user) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
+
+      if (!user.emailVerified) {
+        return NextResponse.json(
+          { error: "Email must be verified before checkout" },
+          { status: 403 }
+        );
+      }
+
+      userId = user.id;
+      const [customerRecord] = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.userId, userId))
+        .limit(1);
+
+      if (!customerRecord) {
+        return NextResponse.json(
+          { error: "Customer not found" },
+          { status: 404 }
+        );
+      }
+      customer = customerRecord;
+    } else {
       return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
+        { error: "Unauthorized. Please sign in or provide verified email." },
+        { status: 401 }
       );
     }
 
@@ -61,7 +106,7 @@ export async function POST(request: NextRequest) {
         name: customer.companyName || undefined,
         metadata: {
           customerId: customer.id,
-          userId: session.user.id,
+          userId: userId,
         },
       });
       stripeCustomerId = stripeCustomer.id;
@@ -89,15 +134,16 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${process.env.NEXTAUTH_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXTAUTH_URL}/signup?canceled=true&plan=${planId}`,
-      metadata: {
-        customerId: customer.id,
-        userId: session.user.id,
-        planId,
-        billingCycle,
-      },
+        metadata: {
+          customerId: customer.id,
+          userId: userId,
+          planId,
+          billingCycle,
+        },
       subscription_data: {
         metadata: {
           customerId: customer.id,
+          userId: userId,
           planId,
           billingCycle,
         },

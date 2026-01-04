@@ -152,6 +152,7 @@ function SignupPageContent() {
         body: JSON.stringify({
           planId: formData.planId,
           billingCycle: formData.billingCycle,
+          email: verifiedEmail || formData.email, // Pass email for unauthenticated checkout
         }),
       });
 
@@ -181,7 +182,7 @@ function SignupPageContent() {
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
 
-        <div className="relative z-10 w-full">
+        <div className="relative z-10 w-full max-w-lg flex items-center justify-center">
           <VerificationPending email={verifiedEmail} />
         </div>
       </div>

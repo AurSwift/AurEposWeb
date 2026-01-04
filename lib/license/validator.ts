@@ -1,10 +1,22 @@
 import crypto from "crypto";
 import { db } from "@/lib/db";
-import { licenseKeys, activations, subscriptions, customers } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  licenseKeys,
+  activations,
+  subscriptions,
+  customers,
+} from "@/lib/db/schema";
+import { eq, and, sql, count } from "drizzle-orm";
 
-// License key format: AUR-{PlanCode}-V{Version}-{Random8Char}-{Checksum}
-const LICENSE_KEY_PATTERN = /^AUR-(BAS|PRO|ENT)-V[0-9]-[A-Z0-9]{8}-[A-Z0-9]{2}$/;
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// License key format: AUR-{PlanCode}-V2-{Random8Char}-{HMACSignature8Char}
+const LICENSE_KEY_PATTERN = /^AUR-(BAS|PRO|ENT)-V2-[A-Z0-9]{8}-[A-Z0-9]{8}$/;
+
+// HMAC secret for license key validation (must be set in environment)
+const LICENSE_HMAC_SECRET = process.env.LICENSE_HMAC_SECRET;
 
 // Plan codes mapping
 const PLAN_CODES: Record<string, string> = {
@@ -16,12 +28,15 @@ const PLAN_CODES: Record<string, string> = {
 // Grace period for initial activation (24 hours) - allows rebinding within this window
 const ACTIVATION_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 
-// Maximum deactivations per year (TODO: implement deactivation limits)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _MAX_DEACTIVATIONS_PER_YEAR = 3;
+// Maximum deactivations per year
+const MAX_DEACTIVATIONS_PER_YEAR = 3;
 
 // Heartbeat validity period (7 days offline grace)
 const OFFLINE_GRACE_PERIOD_DAYS = 7;
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 export interface ActivationRequest {
   licenseKey: string;
@@ -32,6 +47,8 @@ export interface ActivationRequest {
   location?: {
     city?: string;
     country?: string;
+    platform?: string;
+    arch?: string;
   };
 }
 
@@ -77,19 +94,54 @@ export interface HeartbeatResult {
   };
 }
 
+export interface DeactivationResult {
+  success: boolean;
+  message: string;
+  remainingDeactivations?: number;
+}
+
+// ============================================================================
+// CRYPTOGRAPHIC FUNCTIONS
+// ============================================================================
+
 /**
- * Calculate checksum for license key validation
+ * Calculate HMAC signature for license key validation
  */
-function calculateChecksum(key: string): string {
-  let sum = 0;
-  for (let i = 0; i < key.length; i++) {
-    sum += key.charCodeAt(i);
+function calculateHmacSignature(baseKey: string, customerId: string): string {
+  if (!LICENSE_HMAC_SECRET) {
+    throw new Error("LICENSE_HMAC_SECRET environment variable is required");
   }
-  return (sum % 256).toString(16).toUpperCase().padStart(2, "0");
+
+  return crypto
+    .createHmac("sha256", LICENSE_HMAC_SECRET)
+    .update(`${baseKey}-${customerId}`)
+    .digest("hex")
+    .substring(0, 8)
+    .toUpperCase();
 }
 
 /**
- * Validate license key format and checksum
+ * Hash machine ID for storage (we never store raw machine IDs)
+ */
+export function hashMachineId(machineId: string): string {
+  return crypto.createHash("sha256").update(machineId).digest("hex");
+}
+
+/**
+ * Mask license key for logging (security)
+ */
+export function maskLicenseKey(key: string): string {
+  if (!key || key.length < 15) return "INVALID_KEY";
+  // Show only first 8 and last 4 characters: AUR-XXX-V2-****-****
+  return `${key.substring(0, 11)}****-****`;
+}
+
+// ============================================================================
+// VALIDATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Validate license key format
  */
 export function validateLicenseKeyFormat(key: string): {
   valid: boolean;
@@ -101,24 +153,36 @@ export function validateLicenseKeyFormat(key: string): {
 
   const normalizedKey = key.toUpperCase().trim();
 
-  if (!LICENSE_KEY_PATTERN.test(normalizedKey)) {
-    return {
-      valid: false,
-      error: "Invalid license key format. Expected format: AUR-XXX-V2-XXXXXXXX-XX",
-    };
+  if (LICENSE_KEY_PATTERN.test(normalizedKey)) {
+    return { valid: true };
   }
 
-  // Verify checksum
-  const parts = normalizedKey.split("-");
-  const checksumProvided = parts.pop()!;
+  return {
+    valid: false,
+    error:
+      "Invalid license key format. Expected format: AUR-XXX-V2-XXXXXXXX-XXXXXXXX",
+  };
+}
+
+/**
+ * Verify HMAC signature for V2 license keys
+ * Requires database lookup to get customerId
+ */
+export async function verifyLicenseSignature(
+  licenseKey: string,
+  customerId: string
+): Promise<boolean> {
+  const parts = licenseKey.toUpperCase().trim().split("-");
+  const signatureProvided = parts.pop()!;
   const baseKey = parts.join("-");
-  const checksumCalculated = calculateChecksum(baseKey);
 
-  if (checksumProvided !== checksumCalculated) {
-    return { valid: false, error: "Invalid license key checksum" };
-  }
+  const signatureExpected = calculateHmacSignature(baseKey, customerId);
 
-  return { valid: true };
+  // Constant-time comparison to prevent timing attacks
+  return crypto.timingSafeEqual(
+    Buffer.from(signatureProvided),
+    Buffer.from(signatureExpected)
+  );
 }
 
 /**
@@ -173,15 +237,13 @@ export function getPlanFeatures(planId: string): string[] {
   return features[planId] || features.basic;
 }
 
-/**
- * Hash machine ID for storage (we never store raw machine IDs)
- */
-export function hashMachineId(machineId: string): string {
-  return crypto.createHash("sha256").update(machineId).digest("hex");
-}
+// ============================================================================
+// LICENSE ACTIVATION (with Transaction & Row Locking)
+// ============================================================================
 
 /**
  * Activate a license key for a specific machine
+ * Uses database transaction with row locking to prevent race conditions
  */
 export async function activateLicense(
   request: ActivationRequest
@@ -200,185 +262,219 @@ export async function activateLicense(
 
   const normalizedKey = licenseKey.toUpperCase().trim();
 
-  // Step 2: Find license in database
-  const [license] = await db
-    .select()
-    .from(licenseKeys)
-    .where(eq(licenseKeys.licenseKey, normalizedKey))
-    .limit(1);
+  // Use database transaction with row locking to prevent race conditions
+  try {
+    return await db.transaction(async (tx) => {
+      // Step 2: Find and LOCK license row (SELECT ... FOR UPDATE)
+      const [license] = await tx
+        .select()
+        .from(licenseKeys)
+        .where(eq(licenseKeys.licenseKey, normalizedKey))
+        .for("update") // Row-level lock
+        .limit(1);
 
-  if (!license) {
-    return {
-      success: false,
-      message: "License key not found. Please check your key and try again.",
-    };
-  }
-
-  // Step 3: Check if license is active and not revoked
-  if (!license.isActive) {
-    return {
-      success: false,
-      message: "This license key has been deactivated. Please contact support.",
-    };
-  }
-
-  if (license.revokedAt) {
-    return {
-      success: false,
-      message: `This license key was revoked: ${license.revocationReason || "Contact support for details."}`,
-    };
-  }
-
-  // Step 4: Check expiration
-  if (license.expiresAt && new Date(license.expiresAt) < new Date()) {
-    return {
-      success: false,
-      message: "This license key has expired. Please renew your subscription.",
-    };
-  }
-
-  // Step 5: Check subscription status
-  let subscriptionStatus = "active";
-  let businessName: string | null = null;
-
-  if (license.subscriptionId) {
-    const [subscription] = await db
-      .select()
-      .from(subscriptions)
-      .where(eq(subscriptions.id, license.subscriptionId))
-      .limit(1);
-
-    if (subscription) {
-      subscriptionStatus = subscription.status || "active";
-
-      if (subscriptionStatus === "cancelled" || subscriptionStatus === "past_due") {
+      if (!license) {
         return {
           success: false,
-          message: `Your subscription is ${subscriptionStatus}. Please update your payment method.`,
+          message:
+            "License key not found. Please check your key and try again.",
         };
       }
-    }
-  }
 
-  // Get customer info for business name
-  const [customer] = await db
-    .select()
-    .from(customers)
-    .where(eq(customers.id, license.customerId))
-    .limit(1);
+      // Step 3: Check if license is active and not revoked
+      if (!license.isActive) {
+        return {
+          success: false,
+          message:
+            "This license key has been deactivated. Please contact support.",
+        };
+      }
 
-  if (customer) {
-    businessName = customer.companyName;
-  }
+      if (license.revokedAt) {
+        return {
+          success: false,
+          message: `This license key was revoked: ${
+            license.revocationReason || "Contact support for details."
+          }`,
+        };
+      }
 
-  // Step 6: Check existing activations for this license
-  const existingActivations = await db
-    .select()
-    .from(activations)
-    .where(
-      and(
-        eq(activations.licenseKey, normalizedKey),
-        eq(activations.isActive, true)
-      )
-    );
+      // Step 4: Check expiration
+      if (license.expiresAt && new Date(license.expiresAt) < new Date()) {
+        return {
+          success: false,
+          message:
+            "This license key has expired. Please renew your subscription.",
+        };
+      }
 
-  // Step 7: Check if this machine is already activated
-  const existingMachineActivation = existingActivations.find(
-    (a) => a.machineIdHash === machineIdHash
-  );
+      // Step 5: Check subscription status
+      let subscriptionStatus = "active";
+      let businessName: string | null = null;
+      if (license.subscriptionId) {
+        const [subscription] = await tx
+          .select()
+          .from(subscriptions)
+          .where(eq(subscriptions.id, license.subscriptionId))
+          .limit(1);
 
-  if (existingMachineActivation) {
-    // Same machine - update heartbeat and return success
-    await db
-      .update(activations)
-      .set({
-        lastHeartbeat: new Date(),
-        terminalName: terminalName || existingMachineActivation.terminalName,
-      })
-      .where(eq(activations.id, existingMachineActivation.id));
+        if (subscription) {
+          subscriptionStatus = subscription.status || "active";
 
-    const planId = extractPlanFromKey(normalizedKey) || "basic";
+          // Allow trialing subscriptions
+          if (subscriptionStatus === "trialing") {
+            subscriptionStatus = "active";
+          }
 
+          if (
+            subscriptionStatus === "cancelled" ||
+            subscriptionStatus === "past_due"
+          ) {
+            return {
+              success: false,
+              message: `Your subscription is ${subscriptionStatus}. Please update your payment method.`,
+            };
+          }
+        }
+      }
+
+      // Get customer info for business name
+      const [customer] = await tx
+        .select()
+        .from(customers)
+        .where(eq(customers.id, license.customerId))
+        .limit(1);
+
+      if (customer) {
+        businessName = customer.companyName;
+      }
+
+      // Step 6: Get existing activations with lock
+      const existingActivations = await tx
+        .select()
+        .from(activations)
+        .where(
+          and(
+            eq(activations.licenseKey, normalizedKey),
+            eq(activations.isActive, true)
+          )
+        )
+        .for("update"); // Lock activation rows too
+
+      // Step 7: Check if this machine is already activated
+      const existingMachineActivation = existingActivations.find(
+        (a) => a.machineIdHash === machineIdHash
+      );
+
+      if (existingMachineActivation) {
+        // Same machine - update heartbeat and return success
+        await tx
+          .update(activations)
+          .set({
+            lastHeartbeat: new Date(),
+            terminalName:
+              terminalName || existingMachineActivation.terminalName,
+            location: location || existingMachineActivation.location,
+          })
+          .where(eq(activations.id, existingMachineActivation.id));
+
+        const planId = extractPlanFromKey(normalizedKey) || "basic";
+
+        return {
+          success: true,
+          message:
+            "License already activated on this device. Validation updated.",
+          data: {
+            activationId: existingMachineActivation.id,
+            planId,
+            planName: planId.charAt(0).toUpperCase() + planId.slice(1),
+            maxTerminals: license.maxTerminals,
+            currentActivations: existingActivations.length,
+            features: getPlanFeatures(planId),
+            expiresAt: license.expiresAt?.toISOString() || null,
+            subscriptionStatus,
+            businessName,
+          },
+        };
+      }
+
+      // Step 8: Check max terminals limit (atomic with transaction)
+      if (existingActivations.length >= license.maxTerminals) {
+        // Check if any activation is within grace period (can be replaced)
+        const graceActivation = existingActivations.find((a) => {
+          const firstActivation = new Date(a.firstActivation);
+          return (
+            Date.now() - firstActivation.getTime() < ACTIVATION_GRACE_PERIOD_MS
+          );
+        });
+
+        if (!graceActivation) {
+          return {
+            success: false,
+            message: `Maximum terminal limit reached (${license.maxTerminals}). Deactivate another device first or upgrade your plan.`,
+          };
+        }
+
+        // Deactivate the grace period activation to allow new one
+        await tx
+          .update(activations)
+          .set({ isActive: false })
+          .where(eq(activations.id, graceActivation.id));
+      }
+
+      // Step 9: Create new activation
+      const [newActivation] = await tx
+        .insert(activations)
+        .values({
+          licenseKey: normalizedKey,
+          machineIdHash,
+          terminalName: terminalName || "Terminal",
+          firstActivation: new Date(),
+          lastHeartbeat: new Date(),
+          isActive: true,
+          ipAddress: ipAddress || null,
+          location: location || null,
+        })
+        .returning();
+
+      // Step 10: Update activation count ATOMICALLY using SQL increment
+      await tx
+        .update(licenseKeys)
+        .set({
+          activationCount: sql`${licenseKeys.activationCount} + 1`,
+        })
+        .where(eq(licenseKeys.id, license.id));
+
+      const planId = extractPlanFromKey(normalizedKey) || "basic";
+
+      return {
+        success: true,
+        message: "License activated successfully!",
+        data: {
+          activationId: newActivation.id,
+          planId,
+          planName: planId.charAt(0).toUpperCase() + planId.slice(1),
+          maxTerminals: license.maxTerminals,
+          currentActivations: existingActivations.length + 1,
+          features: getPlanFeatures(planId),
+          expiresAt: license.expiresAt?.toISOString() || null,
+          subscriptionStatus,
+          businessName,
+        },
+      };
+    });
+  } catch (error) {
+    console.error("License activation transaction failed:", error);
     return {
-      success: true,
-      message: "License already activated on this device. Validation updated.",
-      data: {
-        activationId: existingMachineActivation.id,
-        planId,
-        planName: planId.charAt(0).toUpperCase() + planId.slice(1),
-        maxTerminals: license.maxTerminals,
-        currentActivations: existingActivations.length,
-        features: getPlanFeatures(planId),
-        expiresAt: license.expiresAt?.toISOString() || null,
-        subscriptionStatus,
-        businessName,
-      },
+      success: false,
+      message: "Activation failed due to a server error. Please try again.",
     };
   }
-
-  // Step 8: Check max terminals limit
-  if (existingActivations.length >= license.maxTerminals) {
-    // Check if any activation is within grace period (can be replaced)
-    const graceActivation = existingActivations.find((a) => {
-      const firstActivation = new Date(a.firstActivation);
-      return Date.now() - firstActivation.getTime() < ACTIVATION_GRACE_PERIOD_MS;
-    });
-
-    if (!graceActivation) {
-      return {
-        success: false,
-        message: `Maximum terminal limit reached (${license.maxTerminals}). Deactivate another device first or upgrade your plan.`,
-      };
-    }
-
-    // Deactivate the grace period activation to allow new one
-    await db
-      .update(activations)
-      .set({ isActive: false })
-      .where(eq(activations.id, graceActivation.id));
-  }
-
-  // Step 9: Create new activation
-  const [newActivation] = await db
-    .insert(activations)
-    .values({
-      licenseKey: normalizedKey,
-      machineIdHash,
-      terminalName: terminalName || "Terminal",
-      firstActivation: new Date(),
-      lastHeartbeat: new Date(),
-      isActive: true,
-      ipAddress: ipAddress || null,
-      location: location || null,
-    })
-    .returning();
-
-  // Step 10: Update activation count on license
-  await db
-    .update(licenseKeys)
-    .set({
-      activationCount: license.activationCount + 1,
-    })
-    .where(eq(licenseKeys.id, license.id));
-
-  const planId = extractPlanFromKey(normalizedKey) || "basic";
-
-  return {
-    success: true,
-    message: "License activated successfully!",
-    data: {
-      activationId: newActivation.id,
-      planId,
-      planName: planId.charAt(0).toUpperCase() + planId.slice(1),
-      maxTerminals: license.maxTerminals,
-      currentActivations: existingActivations.length + 1,
-      features: getPlanFeatures(planId),
-      expiresAt: license.expiresAt?.toISOString() || null,
-      subscriptionStatus,
-      businessName,
-    },
-  };
 }
+
+// ============================================================================
+// VALIDATE LICENSE
+// ============================================================================
 
 /**
  * Validate a license key without activating
@@ -431,6 +527,11 @@ export async function validateLicense(
 
     if (subscription) {
       subscriptionStatus = subscription.status || "active";
+
+      // Trialing is considered active
+      if (subscriptionStatus === "trialing") {
+        subscriptionStatus = "active";
+      }
     }
   }
 
@@ -483,8 +584,13 @@ export async function validateLicense(
   };
 }
 
+// ============================================================================
+// HEARTBEAT (with Fixed Grace Period Calculation)
+// ============================================================================
+
 /**
  * Process heartbeat from desktop app
+ * Grace period is now calculated from subscription cancellation date, not last heartbeat
  */
 export async function processHeartbeat(
   licenseKey: string,
@@ -548,6 +654,8 @@ export async function processHeartbeat(
   // Check subscription status
   let subscriptionStatus = "active";
   let shouldDisable = false;
+  let gracePeriodRemaining: number | null =
+    OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
   if (license.subscriptionId) {
     const [subscription] = await db
@@ -560,16 +668,41 @@ export async function processHeartbeat(
       subscriptionStatus = subscription.status || "active";
 
       if (subscriptionStatus === "cancelled") {
-        // Check if past grace period
-        const lastHeartbeat = activation.lastHeartbeat
-          ? new Date(activation.lastHeartbeat)
-          : new Date(activation.firstActivation);
+        // FIX: Use subscription cancellation date, not last heartbeat
+        // This prevents users from extending grace period by not heartbeating
+        const cancellationDate = subscription.canceledAt
+          ? new Date(subscription.canceledAt)
+          : new Date(); // If no cancellation date, assume now
+
         const gracePeriodEnd = new Date(
-          lastHeartbeat.getTime() + OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+          cancellationDate.getTime() +
+            OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
         );
 
-        if (new Date() > gracePeriodEnd) {
+        const now = new Date();
+        if (now > gracePeriodEnd) {
           shouldDisable = true;
+          gracePeriodRemaining = 0;
+        } else {
+          gracePeriodRemaining = gracePeriodEnd.getTime() - now.getTime();
+        }
+      } else if (subscriptionStatus === "past_due") {
+        // Past due gets shorter grace period (3 days)
+        const lastPaymentAttempt = subscription.currentPeriodEnd
+          ? new Date(subscription.currentPeriodEnd)
+          : new Date();
+
+        const pastDueGracePeriodEnd = new Date(
+          lastPaymentAttempt.getTime() + 3 * 24 * 60 * 60 * 1000
+        );
+
+        const now = new Date();
+        if (now > pastDueGracePeriodEnd) {
+          shouldDisable = true;
+          gracePeriodRemaining = 0;
+        } else {
+          gracePeriodRemaining =
+            pastDueGracePeriodEnd.getTime() - now.getTime();
         }
       }
     }
@@ -582,7 +715,7 @@ export async function processHeartbeat(
       lastHeartbeat: new Date(),
       location: metadata
         ? {
-            ...(activation.location as object || {}),
+            ...((activation.location as object) || {}),
             lastMetadata: metadata,
           }
         : activation.location,
@@ -599,21 +732,61 @@ export async function processHeartbeat(
       planId,
       subscriptionStatus,
       shouldDisable,
-      gracePeriodRemaining: shouldDisable
-        ? 0
-        : OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
+      gracePeriodRemaining,
     },
   };
 }
 
+// ============================================================================
+// DEACTIVATION (with Rate Limiting)
+// ============================================================================
+
+/**
+ * Track deactivation count per license per year
+ */
+async function getDeactivationCountThisYear(
+  licenseKey: string
+): Promise<number> {
+  const startOfYear = new Date();
+  startOfYear.setMonth(0, 1);
+  startOfYear.setHours(0, 0, 0, 0);
+
+  // Count deactivations this year by checking inactive activations
+  const result = await db
+    .select({ count: count() })
+    .from(activations)
+    .where(
+      and(
+        eq(activations.licenseKey, licenseKey),
+        eq(activations.isActive, false)
+      )
+    );
+
+  return result[0]?.count || 0;
+}
+
 /**
  * Deactivate a license on a specific machine
+ * Implements deactivation limits to prevent abuse
  */
 export async function deactivateLicense(
   licenseKey: string,
   machineIdHash: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<DeactivationResult> {
   const normalizedKey = licenseKey.toUpperCase().trim();
+
+  // Check deactivation limit
+  const deactivationsThisYear = await getDeactivationCountThisYear(
+    normalizedKey
+  );
+
+  if (deactivationsThisYear >= MAX_DEACTIVATIONS_PER_YEAR) {
+    return {
+      success: false,
+      message: `Maximum deactivations reached (${MAX_DEACTIVATIONS_PER_YEAR}/year). Please contact support.`,
+      remainingDeactivations: 0,
+    };
+  }
 
   const [activation] = await db
     .select()
@@ -634,13 +807,23 @@ export async function deactivateLicense(
     };
   }
 
+  // Deactivate with timestamp for tracking
   await db
     .update(activations)
-    .set({ isActive: false })
+    .set({
+      isActive: false,
+      // Store deactivation time in location metadata
+      location: {
+        ...((activation.location as object) || {}),
+        deactivatedAt: new Date().toISOString(),
+      },
+    })
     .where(eq(activations.id, activation.id));
 
   return {
     success: true,
     message: "License deactivated successfully",
+    remainingDeactivations:
+      MAX_DEACTIVATIONS_PER_YEAR - deactivationsThisYear - 1,
   };
 }

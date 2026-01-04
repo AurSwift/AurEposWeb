@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { activateLicense } from "@/lib/license/validator";
+import {
+  applyRateLimit,
+  getClientIP,
+  addRateLimitHeaders,
+} from "@/lib/rate-limit";
 
 /**
  * POST /api/license/activate
  * Activate a license key for a specific machine/terminal
+ *
+ * Rate limited: 5 attempts per 15 minutes per IP
  */
 export async function POST(request: NextRequest) {
   try {
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(request);
+
+    // Apply rate limiting (strict for activation to prevent brute force)
+    const rateLimit = applyRateLimit("activate", clientIP);
+    if (rateLimit.blocked) {
+      return rateLimit.response;
+    }
+
     const body = await request.json();
 
     const { licenseKey, machineIdHash, terminalName, appVersion, location } =
@@ -27,29 +43,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get client IP address
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    const realIp = request.headers.get("x-real-ip");
-    const ipAddress = forwardedFor?.split(",")[0] || realIp || "unknown";
-
     // Process activation
     const result = await activateLicense({
       licenseKey,
       machineIdHash,
       terminalName: terminalName || "Terminal",
       appVersion: appVersion || "unknown",
-      ipAddress,
+      ipAddress: clientIP,
       location,
     });
 
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, message: result.message },
-        { status: 400 }
-      );
-    }
+    // Build response with rate limit headers
+    const response = NextResponse.json(
+      result.success ? result : { success: false, message: result.message },
+      { status: result.success ? 200 : 400 }
+    );
 
-    return NextResponse.json(result);
+    addRateLimitHeaders(response.headers, "activate", rateLimit.result);
+    return response;
   } catch (error) {
     console.error("License activation error:", error);
     return NextResponse.json(

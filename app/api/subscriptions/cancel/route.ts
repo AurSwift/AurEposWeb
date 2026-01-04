@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/client";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { subscriptions, customers, licenseKeys, subscriptionChanges } from "@/lib/db/schema";
+import {
+  subscriptions,
+  customers,
+  licenseKeys,
+  subscriptionChanges,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  publishSubscriptionCancelled,
+  getLicenseKeysForSubscription,
+} from "@/lib/subscription-events";
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,7 +92,11 @@ export async function POST(request: NextRequest) {
         subscriptionId,
         customerId: customer.id,
         changeType: "cancellation",
-        reason: reason || (cancelImmediately ? "Immediate cancellation" : "Cancel at period end"),
+        reason:
+          reason ||
+          (cancelImmediately
+            ? "Immediate cancellation"
+            : "Cancel at period end"),
         effectiveDate: cancelImmediately
           ? new Date()
           : subscription.currentPeriodEnd || new Date(),
@@ -105,6 +118,29 @@ export async function POST(request: NextRequest) {
           .where(eq(licenseKeys.subscriptionId, subscriptionId));
       }
     });
+
+    // 🔔 SSE: Notify desktop apps about cancellation (after transaction commits)
+    const licenseKeysList = await getLicenseKeysForSubscription(subscriptionId);
+    const gracePeriodEnd = cancelImmediately
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days grace
+      : subscription.currentPeriodEnd
+      ? new Date(
+          subscription.currentPeriodEnd.getTime() + 7 * 24 * 60 * 60 * 1000
+        )
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    for (const key of licenseKeysList) {
+      publishSubscriptionCancelled(key, {
+        cancelledAt: new Date(),
+        cancelImmediately,
+        gracePeriodEnd,
+        reason:
+          reason ||
+          (cancelImmediately
+            ? "Immediate cancellation"
+            : "Cancel at period end"),
+      });
+    }
 
     return NextResponse.json({
       success: true,
