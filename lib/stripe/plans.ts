@@ -412,6 +412,4 @@ export function clearPlansCache(): void {
   cacheTimestamp = 0;
 }
 
-// Legacy export for backward compatibility (deprecated - use getPlans() instead)
-// This will be removed in a future version
-export const PLANS: Record<PlanId, Plan> = {} as Record<PlanId, Plan>;
+// Removed deprecated PLANS export - use getPlans() instead

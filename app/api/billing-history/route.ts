@@ -1,29 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { customers, payments, subscriptions } from "@/lib/db/schema";
+import { payments, subscriptions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import { successResponse, handleApiError } from "@/lib/api/response-helpers";
+import { getPlanDisplayName } from "@/lib/stripe/plan-utils";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
-      );
-    }
+    const session = await requireAuth();
+    const customer = await getCustomerOrThrow(session.user.id);
 
     // Get all payments with subscription info
     const billingHistory = await db
@@ -48,7 +35,7 @@ export async function GET(request: NextRequest) {
       .where(eq(payments.customerId, customer.id))
       .orderBy(desc(payments.createdAt));
 
-    return NextResponse.json({
+    return successResponse({
       billingHistory: billingHistory.map((item) => ({
         id: item.id,
         invoiceId: `INV-${item.id.substring(0, 8).toUpperCase()}`,
@@ -57,9 +44,7 @@ export async function GET(request: NextRequest) {
         currency: item.currency,
         status: item.status === "completed" ? "Paid" : item.status,
         plan: item.subscription?.planId
-          ? item.subscription.planId.charAt(0).toUpperCase() +
-            item.subscription.planId.slice(1) +
-            " Plan"
+          ? getPlanDisplayName(item.subscription.planId)
           : "N/A",
         period:
           item.billingPeriodStart && item.billingPeriodEnd
@@ -78,14 +63,6 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("Billing history error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch billing history",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to fetch billing history");
   }
 }
-

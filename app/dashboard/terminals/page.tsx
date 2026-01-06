@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Terminal, MapPin, Clock, CheckCircle2, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Terminal,
+  MapPin,
+  Clock,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +38,9 @@ interface LicenseKeyInfo {
 
 export default function TerminalsPage() {
   const [activations, setActivations] = useState<TerminalActivation[]>([]);
-  const [licenseKeyInfo, setLicenseKeyInfo] = useState<LicenseKeyInfo | null>(null);
+  const [licenseKeyInfo, setLicenseKeyInfo] = useState<LicenseKeyInfo | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +88,11 @@ export default function TerminalsPage() {
     );
 
     if (minutesSinceHeartbeat < 5) {
-      return <Badge variant="default" className="bg-green-600">Online</Badge>;
+      return (
+        <Badge variant="default" className="bg-green-600">
+          Online
+        </Badge>
+      );
     } else if (minutesSinceHeartbeat < 60) {
       return <Badge variant="secondary">Idle</Badge>;
     } else {
@@ -139,15 +152,20 @@ export default function TerminalsPage() {
           <CardContent>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">License Key:</span>
+                <span className="text-sm text-muted-foreground">
+                  License Key:
+                </span>
                 <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
                   {licenseKeyInfo.licenseKey}
                 </code>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Terminals:</span>
+                <span className="text-sm text-muted-foreground">
+                  Terminals:
+                </span>
                 <span className="text-sm font-medium">
-                  {licenseKeyInfo.activationCount} / {licenseKeyInfo.maxTerminals} activated
+                  {licenseKeyInfo.activationCount} /{" "}
+                  {licenseKeyInfo.maxTerminals} activated
                 </span>
               </div>
             </div>
@@ -163,9 +181,12 @@ export default function TerminalsPage() {
           {activations.length === 0 ? (
             <div className="text-center py-12">
               <Terminal className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No terminals activated yet</p>
+              <p className="text-muted-foreground">
+                No terminals activated yet
+              </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Activate your first terminal using your license key in the POS application.
+                Activate your first terminal using your license key in the POS
+                application.
               </p>
             </div>
           ) : (
@@ -182,44 +203,94 @@ export default function TerminalsPage() {
                         <h3 className="font-semibold">
                           {activation.terminalName || "Unnamed Terminal"}
                         </h3>
-                        {getStatusBadge(activation.isActive, activation.lastHeartbeat)}
+                        {getStatusBadge(
+                          activation.isActive,
+                          activation.lastHeartbeat
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="text-muted-foreground">First Activated</p>
+                          <p className="text-muted-foreground">
+                            First Activated
+                          </p>
                           <p className="font-medium">
-                            {format(new Date(activation.firstActivation), "MMM dd, yyyy HH:mm")}
+                            {format(
+                              new Date(activation.firstActivation),
+                              "MMM dd, yyyy HH:mm"
+                            )}
                           </p>
                         </div>
                         {activation.lastHeartbeat && (
                           <div>
-                            <p className="text-muted-foreground">Last Heartbeat</p>
-                            <p className="font-medium">
-                              {format(new Date(activation.lastHeartbeat), "MMM dd, yyyy HH:mm")}
-                            </p>
-                          </div>
-                        )}
-                        {activation.ipAddress && (
-                          <div>
-                            <p className="text-muted-foreground">IP Address</p>
-                            <p className="font-medium">{activation.ipAddress}</p>
-                          </div>
-                        )}
-                        {activation.location && (
-                          <div>
-                            <p className="text-muted-foreground flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              Location
+                            <p className="text-muted-foreground">
+                              Last Heartbeat
                             </p>
                             <p className="font-medium">
-                              {activation.location.city && activation.location.country
-                                ? `${activation.location.city}, ${activation.location.country}`
-                                : activation.location.country || activation.location.city || "Unknown"}
+                              {format(
+                                new Date(activation.lastHeartbeat),
+                                "MMM dd, yyyy HH:mm"
+                              )}
                             </p>
                           </div>
                         )}
                       </div>
+
+                      {/* Technical Details - Collapsed by default */}
+                      <details className="mt-4 group">
+                        <summary className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                          <svg
+                            className="h-4 w-4 transition-transform group-open:rotate-90"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                          Technical Details
+                        </summary>
+                        <div className="mt-3 ml-6 grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Machine ID</p>
+                            <p className="font-mono text-xs break-all opacity-70">
+                              {activation.machineIdHash?.substring(0, 16)}...
+                            </p>
+                          </div>
+                          {activation.ipAddress && (
+                            <div>
+                              <p className="text-muted-foreground">
+                                IP Address
+                              </p>
+                              <p className="font-mono text-xs opacity-70">
+                                {activation.ipAddress}
+                              </p>
+                            </div>
+                          )}
+                          {activation.location &&
+                            (activation.location.city ||
+                              activation.location.country) && (
+                              <div>
+                                <p className="text-muted-foreground flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  Location
+                                </p>
+                                <p className="text-xs opacity-70">
+                                  {activation.location.city &&
+                                  activation.location.country
+                                    ? `${activation.location.city}, ${activation.location.country}`
+                                    : activation.location.country ||
+                                      activation.location.city ||
+                                      "Unknown"}
+                                </p>
+                              </div>
+                            )}
+                        </div>
+                      </details>
                     </div>
                   </div>
                 </div>
@@ -231,4 +302,3 @@ export default function TerminalsPage() {
     </div>
   );
 }
-

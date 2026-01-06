@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
 import { BillingToggle } from "./billing-toggle";
+import { calculateAnnualSavings } from "@/lib/stripe/plan-utils";
 import type { Plan, BillingCycle, PlanId } from "@/lib/stripe/plans";
 
 interface PlanCardProps {
@@ -32,26 +33,21 @@ export function PlanCard({
   const [localBillingCycle, setLocalBillingCycle] =
     useState<BillingCycle>(billingCycle);
 
-  // Sync local billing cycle with global when plan is selected
+  // Sync billing cycle with global state
   useEffect(() => {
     if (isSelected && selectedBillingCycle) {
       setLocalBillingCycle(selectedBillingCycle);
+    } else {
+      setLocalBillingCycle(billingCycle);
     }
-  }, [isSelected, selectedBillingCycle]);
-
-  // Sync with global billing cycle when it changes (for initial state)
-  useEffect(() => {
-    setLocalBillingCycle(billingCycle);
-  }, [billingCycle]);
+  }, [isSelected, selectedBillingCycle, billingCycle]);
 
   const isThisPlanSelected = isSelected && selectedBillingCycle === localBillingCycle;
 
   const price =
     localBillingCycle === "monthly" ? plan.priceMonthly : plan.priceAnnual;
   const savings =
-    localBillingCycle === "annual"
-      ? plan.priceMonthly * 12 - plan.priceAnnual
-      : 0;
+    localBillingCycle === "annual" ? calculateAnnualSavings(plan) : 0;
 
   const handleBillingCycleChange = (cycle: BillingCycle) => {
     setLocalBillingCycle(cycle);
@@ -95,6 +91,7 @@ export function PlanCard({
         <BillingToggle
           billingCycle={localBillingCycle}
           onCycleChange={handleBillingCycleChange}
+          annualDiscountPercent={plan.annualDiscountPercent}
         />
         <ul className="space-y-2">
           {plan.features.features.map((feature, idx) => (
@@ -108,6 +105,8 @@ export function PlanCard({
           onClick={handleSelect}
           className="w-full"
           variant={plan.popular || isThisPlanSelected ? "default" : "outline"}
+          aria-label={`Select ${plan.name} plan for ${localBillingCycle} billing`}
+          aria-pressed={isThisPlanSelected}
         >
           {isThisPlanSelected ? "Selected" : "Select Plan"}
         </Button>
@@ -115,4 +114,7 @@ export function PlanCard({
     </Card>
   );
 }
+
+// Memoize component for performance
+export default memo(PlanCard);
 

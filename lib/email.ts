@@ -1,9 +1,18 @@
 import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
 /**
  * Create Gmail SMTP transporter
+ * Single source of truth for email configuration
+ * 
+ * @returns Configured Nodemailer transporter
+ * @throws Error if Gmail credentials are not configured
+ * 
+ * @example
+ * const transporter = createTransporter();
+ * await transporter.sendMail(mailOptions);
  */
-function createTransporter() {
+export function createTransporter(): Transporter {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     throw new Error(
       "GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required"
@@ -17,6 +26,14 @@ function createTransporter() {
       pass: process.env.GMAIL_APP_PASSWORD, // Gmail App Password (not regular password)
     },
   });
+}
+
+/**
+ * Get configured "from" email address
+ * @returns Configured sender email address
+ */
+export function getFromEmail(): string {
+  return process.env.GMAIL_USER || process.env.GMAIL_FROM_EMAIL || "";
 }
 
 /**

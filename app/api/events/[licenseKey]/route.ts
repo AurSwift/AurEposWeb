@@ -39,30 +39,61 @@ async function validateLicenseKey(
   licenseKey: string,
   machineIdHash?: string
 ): Promise<{ valid: boolean; error?: string }> {
+  const normalizedKey = licenseKey.toUpperCase();
+
+  console.log(
+    `[SSE] Validating license: ${normalizedKey.substring(
+      0,
+      15
+    )}..., machineId: ${machineIdHash?.substring(0, 20)}...`
+  );
+
   // Check license exists and is active
   const [license] = await db
     .select()
     .from(licenseKeys)
     .where(
       and(
-        eq(licenseKeys.licenseKey, licenseKey.toUpperCase()),
+        eq(licenseKeys.licenseKey, normalizedKey),
         eq(licenseKeys.isActive, true)
       )
     )
     .limit(1);
 
   if (!license) {
+    console.log(
+      `[SSE] License not found or inactive: ${normalizedKey.substring(
+        0,
+        15
+      )}...`
+    );
     return { valid: false, error: "License key not found or inactive" };
   }
 
+  console.log(`[SSE] License found: ${license.id}`);
+
   // If machine hash provided, verify it's activated
   if (machineIdHash) {
+    // First, check what activations exist for this license
+    const allActivations = await db
+      .select()
+      .from(activations)
+      .where(eq(activations.licenseKey, normalizedKey));
+
+    console.log(
+      `[SSE] Found ${allActivations.length} activations for license:`,
+      allActivations.map((a) => ({
+        machineIdHash: a.machineIdHash?.substring(0, 20) + "...",
+        isActive: a.isActive,
+      }))
+    );
+
     const [activation] = await db
       .select()
       .from(activations)
       .where(
         and(
-          eq(activations.licenseKey, licenseKey.toUpperCase()),
+          eq(activations.licenseKey, normalizedKey),
           eq(activations.machineIdHash, machineIdHash),
           eq(activations.isActive, true)
         )
@@ -70,8 +101,16 @@ async function validateLicenseKey(
       .limit(1);
 
     if (!activation) {
+      console.log(
+        `[SSE] Machine not activated. Looking for: ${machineIdHash?.substring(
+          0,
+          20
+        )}...`
+      );
       return { valid: false, error: "Machine not activated for this license" };
     }
+
+    console.log(`[SSE] Machine activation found: ${activation.id}`);
   }
 
   return { valid: true };

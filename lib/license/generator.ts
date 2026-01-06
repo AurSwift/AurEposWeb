@@ -1,43 +1,16 @@
-import crypto from "crypto";
 import { db } from "@/lib/db";
 import { licenseKeys } from "@/lib/db/schema";
 import type { PlanId } from "@/lib/stripe/plans";
-
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
-
-const PLAN_CODES: Record<PlanId, string> = {
-  basic: "BAS",
-  professional: "PRO",
-  enterprise: "ENT",
-};
-
-// HMAC secret for cryptographically secure license signatures
-const LICENSE_HMAC_SECRET = process.env.LICENSE_HMAC_SECRET;
-
-// License key version
-const LICENSE_VERSION = "V2";
+import {
+  calculateHmacSignature,
+  generateSecureRandom,
+} from "./crypto";
+import { PLAN_CODES, LICENSE_VERSION } from "./constants";
+import { timingSafeEqual } from "crypto";
 
 // ============================================================================
 // LICENSE KEY GENERATION
 // ============================================================================
-
-/**
- * Generate cryptographically secure HMAC signature for license key
- */
-function calculateHmacSignature(baseKey: string, customerId: string): string {
-  if (!LICENSE_HMAC_SECRET) {
-    throw new Error("LICENSE_HMAC_SECRET environment variable is required");
-  }
-
-  return crypto
-    .createHmac("sha256", LICENSE_HMAC_SECRET)
-    .update(`${baseKey}-${customerId}`)
-    .digest("hex")
-    .substring(0, 8)
-    .toUpperCase();
-}
 
 /**
  * Generate license key with HMAC signature
@@ -48,11 +21,7 @@ export function generateLicenseKey(planId: PlanId, customerId: string): string {
   const planCode = PLAN_CODES[planId];
 
   // Generate unique 8-character random string (cryptographically secure)
-  const uniquePart = crypto
-    .randomBytes(4)
-    .toString("hex")
-    .toUpperCase()
-    .substring(0, 8);
+  const uniquePart = generateSecureRandom(8);
 
   // Create base key (without signature)
   const baseKey = `AUR-${planCode}-${LICENSE_VERSION}-${uniquePart}`;
@@ -83,7 +52,7 @@ export function verifyLicenseSignature(
     // Constant-time comparison to prevent timing attacks
     if (signatureProvided.length !== signatureExpected.length) return false;
 
-    return crypto.timingSafeEqual(
+    return timingSafeEqual(
       Buffer.from(signatureProvided),
       Buffer.from(signatureExpected)
     );

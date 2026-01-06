@@ -1,43 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { subscriptions, customers, subscriptionChanges } from "@/lib/db/schema";
+import { subscriptions, subscriptionChanges } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   publishSubscriptionReactivated,
   getLicenseKeysForSubscription,
 } from "@/lib/subscription-events";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import {
+  successResponse,
+  handleApiError,
+  ValidationError,
+} from "@/lib/api/response-helpers";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const session = await requireAuth();
     const { subscriptionId } = await request.json();
 
     if (!subscriptionId) {
-      return NextResponse.json(
-        { error: "Subscription ID is required" },
-        { status: 400 }
-      );
+      throw new ValidationError("Subscription ID is required");
     }
 
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
-      );
-    }
+    const customer = await getCustomerOrThrow(session.user.id);
 
     // Get subscription
     const [subscription] = await db
@@ -52,18 +39,12 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!subscription || !subscription.stripeSubscriptionId) {
-      return NextResponse.json(
-        { error: "Subscription not found" },
-        { status: 404 }
-      );
+      throw new ValidationError("Subscription not found");
     }
 
     // Check if subscription is eligible for reactivation
     if (!subscription.cancelAtPeriodEnd) {
-      return NextResponse.json(
-        { error: "Subscription is not scheduled for cancellation" },
-        { status: 400 }
-      );
+      throw new ValidationError("Subscription is not scheduled for cancellation");
     }
 
     // Reactivate in Stripe
@@ -107,18 +88,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       message: "Subscription reactivated successfully",
     });
   } catch (error) {
-    console.error("Subscription reactivation error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to reactivate subscription",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to reactivate subscription");
   }
 }

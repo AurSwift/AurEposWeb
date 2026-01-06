@@ -17,14 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { AlertCircle, ArrowRight } from "lucide-react";
 import { PlanCard } from "@/components/pricing/plan-card";
+import { PricingStructuredData } from "@/components/pricing/structured-data";
 import { type PlanId, type BillingCycle, type Plan } from "@/lib/stripe/plans";
+import { calculateAnnualSavings } from "@/lib/stripe/plan-utils";
 import { useSession } from "next-auth/react";
-
-// Helper function to calculate annual savings
-function calculateAnnualSavings(plan: Plan): number {
-  const monthlyTotal = plan.priceMonthly * 12;
-  return monthlyTotal - plan.priceAnnual;
-}
 
 function PricingPageContent() {
   const router = useRouter();
@@ -34,9 +30,12 @@ function PricingPageContent() {
     {} as Record<PlanId, Plan>
   );
   const [plansLoading, setPlansLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    planId: "" as PlanId | "",
-    billingCycle: "monthly" as BillingCycle,
+  const [formData, setFormData] = useState<{
+    planId: PlanId | null;
+    billingCycle: BillingCycle;
+  }>({
+    planId: null,
+    billingCycle: "monthly",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -60,33 +59,93 @@ function PricingPageContent() {
     }
   }, [searchParams]);
 
-  // Fetch plans from API
+  // Fetch plans from API with retry logic
   useEffect(() => {
-    async function fetchPlans() {
-      try {
-        const response = await fetch("/api/plans");
-        const data = await response.json();
-        if (data.plans) {
+    async function fetchPlans(retries = 3, delay = 1000) {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          const response = await fetch("/api/plans");
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          // Validate response structure
+          if (!data.plans || typeof data.plans !== "object") {
+            throw new Error("Invalid response format");
+          }
+          
+          // Basic validation of plan structure
+          const planIds: PlanId[] = ["basic", "professional", "enterprise"];
+          for (const planId of planIds) {
+            if (!data.plans[planId]) {
+              console.warn(`Missing plan: ${planId}`);
+            }
+          }
+          
           setPlans(data.plans);
+          setError("");
+          return;
+        } catch (err) {
+          console.error(`Attempt ${attempt + 1} failed:`, err);
+          
+          if (attempt === retries - 1) {
+            setError("Failed to load plans. Please refresh the page.");
+          } else {
+            // Exponential backoff
+            await new Promise((resolve) =>
+              setTimeout(resolve, delay * Math.pow(2, attempt))
+            );
+          }
         }
-      } catch {
-        setError("Failed to load plans. Please refresh the page.");
-      } finally {
-        setPlansLoading(false);
       }
+      setPlansLoading(false);
     }
+    
     fetchPlans();
   }, []);
 
   // Handle plan selection with billing cycle
   const handlePlanSelect = (planId: PlanId, billingCycle: BillingCycle) => {
     setFormData({ ...formData, planId, billingCycle });
+    
+    // Track selection event (if analytics is available)
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "plan_selected", {
+        plan_id: planId,
+        billing_cycle: billingCycle,
+        price:
+          plans[planId]?.[
+            billingCycle === "monthly" ? "priceMonthly" : "priceAnnual"
+          ],
+      });
+    }
   };
 
-  // Handle checkout
+  // Handle checkout with validation
   const handleCheckout = async () => {
+    // Validate plan selection
     if (!formData.planId) {
       setError("Please select a plan");
+      return;
+    }
+
+    // Validate plan exists
+    if (!plans[formData.planId]) {
+      setError("Invalid plan selected");
+      return;
+    }
+
+    // Validate price is positive
+    const price =
+      formData.billingCycle === "monthly"
+        ? plans[formData.planId].priceMonthly
+        : plans[formData.planId].priceAnnual;
+
+    if (price <= 0) {
+      setError("Invalid plan pricing");
       return;
     }
 
@@ -119,6 +178,15 @@ function PricingPageContent() {
 
       // Redirect to Stripe Checkout
       if (data.url) {
+        // Track checkout initiation
+        if (typeof window !== "undefined" && (window as any).gtag) {
+          (window as any).gtag("event", "begin_checkout", {
+            plan_id: formData.planId,
+            billing_cycle: formData.billingCycle,
+            value: price,
+          });
+        }
+        
         window.location.href = data.url;
       }
     } catch {
@@ -138,6 +206,9 @@ function PricingPageContent() {
 
   return (
     <div className="min-h-screen">
+      {/* Add structured data for SEO */}
+      {Object.keys(plans).length > 0 && <PricingStructuredData plans={plans} />}
+      
       <Header />
       <div className="py-12 px-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
         {/* Decorative gradient orbs */}
@@ -167,6 +238,21 @@ function PricingPageContent() {
           {plansLoading ? (
             <div className="text-center py-16">
               <p className="text-muted-foreground text-lg">Loading plans...</p>
+            </div>
+          ) : Object.keys(plans).length === 0 ? (
+            <div className="text-center py-16">
+              <Card className="max-w-lg mx-auto">
+                <CardContent className="pt-6">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">No Plans Available</h3>
+                  <p className="text-muted-foreground mb-4">
+                    We couldn't load our pricing plans. Please try again later.
+                  </p>
+                  <Button onClick={() => window.location.reload()}>
+                    Refresh Page
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           ) : (
             <>
@@ -203,7 +289,7 @@ function PricingPageContent() {
           open={!!formData.planId}
           onOpenChange={(open) => {
             if (!open) {
-              setFormData({ ...formData, planId: "" as PlanId | "" });
+              setFormData({ ...formData, planId: null });
             }
           }}
         >
@@ -261,9 +347,7 @@ function PricingPageContent() {
 
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    setFormData({ ...formData, planId: "" as PlanId | "" })
-                  }
+                  onClick={() => setFormData({ ...formData, planId: null })}
                   className="w-full"
                 >
                   Change Selection
@@ -291,7 +375,8 @@ function PricingPageContent() {
   );
 }
 
-export default function PricingPage() {
+// Separate the Suspense wrapper for the search params hook
+function PricingPageWithSuspense() {
   return (
     <Suspense
       fallback={
@@ -310,3 +395,5 @@ export default function PricingPage() {
     </Suspense>
   );
 }
+
+export default PricingPageWithSuspense;

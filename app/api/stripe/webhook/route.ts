@@ -8,7 +8,7 @@ import {
   webhookEvents,
   subscriptionChanges,
 } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { generateLicenseKey, storeLicenseKey } from "@/lib/license/generator";
 import { getPlan, type PlanId } from "@/lib/stripe/plans";
 import {
@@ -88,8 +88,6 @@ interface StripeInvoiceData {
   period_end: number;
 }
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature")!;
@@ -117,7 +115,7 @@ export async function POST(request: NextRequest) {
       .values({
         stripeEventId: event.id,
         eventType: event.type,
-        metadata: event.data.object as Record<string, unknown>,
+        metadata: event.data.object as unknown as Record<string, unknown>,
         processed: false, // Will be set to true after successful processing
       })
       .onConflictDoNothing({ target: webhookEvents.stripeEventId })
@@ -147,25 +145,27 @@ export async function POST(request: NextRequest) {
 
       case "customer.subscription.created":
       case "customer.subscription.updated": {
-        const subscription = event.data.object as StripeSubscriptionData;
+        const subscription = event.data
+          .object as unknown as StripeSubscriptionData;
         await handleSubscriptionUpdated(subscription);
         break;
       }
 
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as StripeSubscriptionData;
+        const subscription = event.data
+          .object as unknown as StripeSubscriptionData;
         await handleSubscriptionDeleted(subscription);
         break;
       }
 
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as StripeInvoiceData;
+        const invoice = event.data.object as unknown as StripeInvoiceData;
         await handlePaymentSucceeded(invoice);
         break;
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as StripeInvoiceData;
+        const invoice = event.data.object as unknown as StripeInvoiceData;
         await handlePaymentFailed(invoice);
         break;
       }
@@ -230,7 +230,7 @@ async function handleCheckoutCompleted(session: CheckoutSessionData) {
 
   const stripeSubscription = (await stripe.subscriptions.retrieve(
     subscriptionId
-  )) as StripeSubscriptionData;
+  )) as unknown as StripeSubscriptionData;
 
   // Get customer
   const [customer] = await db
@@ -287,16 +287,84 @@ async function handleCheckoutCompleted(session: CheckoutSessionData) {
     })
     .returning();
 
-  // Generate and store license key
-  const licenseKey = generateLicenseKey(planId, customer.id);
+  // Plan code mapping for license key prefix
+  const PLAN_CODES: Record<string, string> = {
+    basic: "BAS",
+    professional: "PRO",
+    enterprise: "ENT",
+  };
 
-  await storeLicenseKey(
-    licenseKey,
-    customer.id,
-    subscription.id,
-    planId,
-    plan.features.maxTerminals
-  );
+  // Check for existing license key
+  const [existingLicense] = await db
+    .select()
+    .from(licenseKeys)
+    .where(eq(licenseKeys.customerId, customer.id))
+    .orderBy(desc(licenseKeys.createdAt))
+    .limit(1);
+
+  let licenseKey: string;
+
+  // Determine if we need a new license based on plan tier change
+  const currentPlanCode = PLAN_CODES[planId] || "BAS";
+  const existingPlanCode = existingLicense?.licenseKey?.split("-")[1]; // e.g., "AUR-BAS-V2-xxx" -> "BAS"
+  const planTierChanged =
+    existingLicense && existingPlanCode !== currentPlanCode;
+
+  if (existingLicense && !existingLicense.revokedAt && !planTierChanged) {
+    // Reuse existing license - same plan tier, just billing cycle or reactivation
+    licenseKey = existingLicense.licenseKey;
+
+    await db
+      .update(licenseKeys)
+      .set({
+        subscriptionId: subscription.id,
+        maxTerminals: plan.features.maxTerminals,
+        isActive: true,
+      })
+      .where(eq(licenseKeys.id, existingLicense.id));
+
+    console.log(
+      `[Webhook] Reusing existing license: ${licenseKey.substring(0, 15)}...`
+    );
+  } else {
+    // Generate NEW license if:
+    // - No previous license exists
+    // - Previous license was revoked
+    // - Plan TIER changed (BAS → PRO, PRO → ENT, etc.)
+
+    // Deactivate old license if plan tier changed
+    if (existingLicense && planTierChanged) {
+      await db
+        .update(licenseKeys)
+        .set({
+          isActive: false,
+          revokedAt: new Date(),
+          revocationReason: `Upgraded to ${planId} plan`,
+        })
+        .where(eq(licenseKeys.id, existingLicense.id));
+
+      console.log(
+        `[Webhook] Deactivated old license due to plan tier change: ${existingPlanCode} → ${currentPlanCode}`
+      );
+    }
+
+    licenseKey = generateLicenseKey(planId, customer.id);
+
+    await storeLicenseKey(
+      licenseKey,
+      customer.id,
+      subscription.id,
+      planId,
+      plan.features.maxTerminals
+    );
+
+    console.log(
+      `[Webhook] Generated new license: ${licenseKey.substring(
+        0,
+        15
+      )}... (plan: ${planId})`
+    );
+  }
 
   // For subscription checkouts, payment records are typically created via invoice.payment_succeeded webhook
   // However, if the invoice is already paid, create the payment record now as a fallback
@@ -319,7 +387,7 @@ async function handleCheckoutCompleted(session: CheckoutSessionData) {
       if (latestInvoiceId && typeof latestInvoiceId === "string") {
         const invoice = (await stripe.invoices.retrieve(
           latestInvoiceId
-        )) as StripeInvoiceData;
+        )) as unknown as StripeInvoiceData;
         // Check if invoice is paid and has payment intent
         const paymentIntentId =
           typeof invoice.payment_intent === "string"
@@ -426,7 +494,9 @@ async function handleSubscriptionUpdated(subscription: StripeSubscriptionData) {
   // - Past due subscription becomes active after payment
   // - Subscription resumed after being cancelled
   // =========================================================================
-  const wasInactive = ["cancelled", "past_due"].includes(previousStatus);
+  const wasInactive = previousStatus
+    ? ["cancelled", "past_due"].includes(previousStatus)
+    : false;
   const isNowActive = ["active", "trialing"].includes(newStatus);
 
   if (wasInactive && isNowActive) {
@@ -606,7 +676,19 @@ async function handlePaymentSucceeded(invoice: StripeInvoiceData) {
   await createPaymentFromInvoice(
     subscription.customerId,
     subscription.id,
-    invoice,
+    {
+      id: invoice.id,
+      amount_paid: invoice.amount_paid,
+      amount_due: invoice.amount_due,
+      currency: invoice.currency,
+      payment_intent:
+        typeof invoice.payment_intent === "string"
+          ? invoice.payment_intent
+          : invoice.payment_intent?.id ?? null,
+      hosted_invoice_url: invoice.hosted_invoice_url,
+      period_start: invoice.period_start,
+      period_end: invoice.period_end,
+    },
     "completed"
   );
 
@@ -657,7 +739,19 @@ async function handlePaymentFailed(invoice: StripeInvoiceData) {
   await createPaymentFromInvoice(
     subscription.customerId,
     subscription.id,
-    invoice,
+    {
+      id: invoice.id,
+      amount_paid: invoice.amount_paid,
+      amount_due: invoice.amount_due,
+      currency: invoice.currency,
+      payment_intent:
+        typeof invoice.payment_intent === "string"
+          ? invoice.payment_intent
+          : invoice.payment_intent?.id ?? null,
+      hosted_invoice_url: invoice.hosted_invoice_url,
+      period_start: invoice.period_start,
+      period_end: invoice.period_end,
+    },
     "failed"
   );
 

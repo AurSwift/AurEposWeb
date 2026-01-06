@@ -1,29 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
-import { auth } from "@/auth";
-import { db } from "@/lib/db";
-import { customers } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import {
+  successResponse,
+  handleApiError,
+  ValidationError,
+} from "@/lib/api/response-helpers";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const session = await requireAuth();
+    const customer = await getCustomerOrThrow(session.user.id);
 
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer || !customer.stripeCustomerId) {
-      return NextResponse.json(
-        { error: "No Stripe customer found" },
-        { status: 404 }
-      );
+    if (!customer.stripeCustomerId) {
+      throw new ValidationError("No Stripe customer found");
     }
 
     // Create portal session
@@ -32,15 +23,8 @@ export async function POST(request: NextRequest) {
       return_url: `${process.env.NEXTAUTH_URL}/dashboard`,
     });
 
-    return NextResponse.json({ url: portalSession.url });
+    return successResponse({ url: portalSession.url });
   } catch (error) {
-    console.error("Portal session error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to create portal session",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to create portal session");
   }
 }

@@ -49,11 +49,12 @@ export default async function DashboardPage() {
     .orderBy(desc(subscriptions.createdAt))
     .limit(1);
 
-  // Get license key
+  // Get license key - prioritize active licenses, then newest
   const [licenseKeyResult] = await db
     .select()
     .from(licenseKeys)
     .where(eq(licenseKeys.customerId, customer.id))
+    .orderBy(desc(licenseKeys.isActive), desc(licenseKeys.createdAt))
     .limit(1);
 
   const licenseKey = licenseKeyResult?.licenseKey || "Not Assigned";

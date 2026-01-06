@@ -123,60 +123,62 @@ export function checkRateLimit(
 // ============================================================================
 
 /**
- * Rate limit configurations for different license operations
+ * Rate limit configurations for different operations
  */
-export const LICENSE_RATE_LIMITS = {
-  // Activation: 5 attempts per 15 minutes per IP
-  // Block for 1 hour if exceeded (prevent brute force)
+export const API_RATE_LIMITS = {
+  // License operations
   activate: {
     windowMs: 15 * 60 * 1000, // 15 minutes
     maxRequests: 5,
     blockDurationMs: 60 * 60 * 1000, // 1 hour block
   },
 
-  // Validation: 30 requests per minute per license key
-  // More permissive as this is called regularly
   validate: {
     windowMs: 60 * 1000, // 1 minute
     maxRequests: 30,
   },
 
-  // Heartbeat: 12 requests per minute per license key
-  // Expected: 1 per minute, but allow bursts
   heartbeat: {
     windowMs: 60 * 1000, // 1 minute
     maxRequests: 12,
   },
 
-  // Deactivation: 3 attempts per hour per IP
-  // Strict to prevent abuse
   deactivate: {
     windowMs: 60 * 60 * 1000, // 1 hour
     maxRequests: 3,
     blockDurationMs: 2 * 60 * 60 * 1000, // 2 hour block
   },
+
+  // Public API endpoints
+  plans: {
+    windowMs: 60 * 1000, // 1 minute
+    maxRequests: 60, // 60 requests per minute per IP
+  },
 } as const;
+
+// Keep backward compatibility
+export const LICENSE_RATE_LIMITS = API_RATE_LIMITS;
 
 /**
  * Create composite identifier for rate limiting
  */
 export function createRateLimitKey(
-  endpoint: keyof typeof LICENSE_RATE_LIMITS,
+  endpoint: keyof typeof API_RATE_LIMITS,
   ...parts: string[]
 ): string {
-  return `license:${endpoint}:${parts.filter(Boolean).join(":")}`;
+  return `api:${endpoint}:${parts.filter(Boolean).join(":")}`;
 }
 
 /**
  * Apply rate limit and return Response if blocked
  */
 export function applyRateLimit(
-  endpoint: keyof typeof LICENSE_RATE_LIMITS,
+  endpoint: keyof typeof API_RATE_LIMITS,
   identifier: string
 ):
   | { blocked: true; response: Response }
   | { blocked: false; result: RateLimitResult } {
-  const config = LICENSE_RATE_LIMITS[endpoint];
+  const config = API_RATE_LIMITS[endpoint];
   const key = createRateLimitKey(endpoint, identifier);
   const result = checkRateLimit(key, config);
 
@@ -186,7 +188,7 @@ export function applyRateLimit(
       response: new Response(
         JSON.stringify({
           success: false,
-          message: "Too many requests. Please try again later.",
+          error: "Too many requests. Please try again later.",
           retryAfter: result.retryAfter,
         }),
         {
@@ -211,10 +213,10 @@ export function applyRateLimit(
  */
 export function addRateLimitHeaders(
   headers: Headers,
-  endpoint: keyof typeof LICENSE_RATE_LIMITS,
+  endpoint: keyof typeof API_RATE_LIMITS,
   result: RateLimitResult
 ): void {
-  const config = LICENSE_RATE_LIMITS[endpoint];
+  const config = API_RATE_LIMITS[endpoint];
   headers.set("X-RateLimit-Limit", String(config.maxRequests));
   headers.set("X-RateLimit-Remaining", String(result.remaining));
   headers.set("X-RateLimit-Reset", result.resetAt.toISOString());

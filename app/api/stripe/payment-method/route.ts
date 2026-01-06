@@ -1,9 +1,7 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { stripe } from "@/lib/stripe/client";
-import { db } from "@/lib/db";
-import { customers } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import { successResponse, handleApiError } from "@/lib/api/response-helpers";
 
 /**
  * GET /api/stripe/payment-method
@@ -11,20 +9,11 @@ import { eq } from "drizzle-orm";
  */
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get customer record
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
+    const session = await requireAuth();
+    const customer = await getCustomerOrThrow(session.user.id);
 
     if (!customer?.stripeCustomerId) {
-      return NextResponse.json({ paymentMethod: null });
+      return successResponse({ paymentMethod: null });
     }
 
     // Fetch Stripe customer with default payment method
@@ -36,19 +25,19 @@ export async function GET() {
     );
 
     if (stripeCustomer.deleted) {
-      return NextResponse.json({ paymentMethod: null });
+      return successResponse({ paymentMethod: null });
     }
 
     const defaultPaymentMethod =
       stripeCustomer.invoice_settings?.default_payment_method;
 
     if (!defaultPaymentMethod || typeof defaultPaymentMethod === "string") {
-      return NextResponse.json({ paymentMethod: null });
+      return successResponse({ paymentMethod: null });
     }
 
     // Extract card details (safe to share - last 4 digits only)
     if (defaultPaymentMethod.type === "card" && defaultPaymentMethod.card) {
-      return NextResponse.json({
+      return successResponse({
         paymentMethod: {
           id: defaultPaymentMethod.id,
           type: "card",
@@ -60,12 +49,8 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ paymentMethod: null });
+    return successResponse({ paymentMethod: null });
   } catch (error) {
-    console.error("Payment method fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch payment method" },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to fetch payment method");
   }
 }

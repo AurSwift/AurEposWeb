@@ -1,35 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
+import { NextRequest } from "next/server";
 import { getUserData } from "@/lib/auth-utils";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { successResponse, handleApiError } from "@/lib/api/response-helpers";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
+    const session = await requireAuth();
     const userData = await getUserData(session.user.id);
 
     if (!userData) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      throw new Error("User not found");
     }
 
-    return NextResponse.json(userData);
+    return successResponse(userData);
   } catch (error) {
-    console.error("Get user data error:", error);
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to get user data");
   }
 }
 

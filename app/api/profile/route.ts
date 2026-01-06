@@ -1,43 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { customers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import { handleApiError, successResponse } from "@/lib/api/response-helpers";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
-      );
-    }
+    const session = await requireAuth();
+    const customer = await getCustomerOrThrow(session.user.id);
 
     // Parse billing address if it exists
-    const billingAddress = customer.billingAddress as
-      | {
-          address?: string;
-          city?: string;
-          state?: string;
-          zipCode?: string;
-          country?: string;
-          phone?: string;
-        }
-      | null;
+    const billingAddress = customer.billingAddress as {
+      address?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string;
+      country?: string;
+      phone?: string;
+    } | null;
 
-    return NextResponse.json({
+    return successResponse({
       profile: {
         companyName: customer.companyName || "",
         email: customer.email,
@@ -51,37 +35,14 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Profile fetch error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch profile",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to fetch profile");
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
-      );
-    }
+    const session = await requireAuth();
+    const customer = await getCustomerOrThrow(session.user.id);
 
     const body = await request.json();
     const {
@@ -115,19 +76,11 @@ export async function PUT(request: NextRequest) {
       })
       .where(eq(customers.id, customer.id));
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       message: "Profile updated successfully",
     });
   } catch (error) {
-    console.error("Profile update error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to update profile",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to update profile");
   }
 }
-

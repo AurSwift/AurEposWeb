@@ -55,10 +55,10 @@ export async function POST(request: NextRequest) {
     // Process validation
     const result = await validateLicense(licenseKey, machineIdHash);
 
-    const response = NextResponse.json(
-      result.success ? result : { success: false, message: result.message },
-      { status: result.success ? 200 : 400 }
-    );
+    // Pass through all fields including code and revocationReason for revoked licenses
+    const response = NextResponse.json(result, {
+      status: result.success ? 200 : 400,
+    });
 
     addRateLimitHeaders(response.headers, "validate", rateLimitResult);
     return response;

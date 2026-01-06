@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { stripe } from "@/lib/stripe/client";
 import { db } from "@/lib/db";
-import { customers, subscriptions, licenseKeys } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { subscriptions, licenseKeys } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { getPlan } from "@/lib/stripe/plans";
 import { generateLicenseKey } from "@/lib/license/generator";
-import Stripe from "stripe";
+import type Stripe from "stripe";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import {
+  successResponse,
+  handleApiError,
+  ValidationError,
+} from "@/lib/api/response-helpers";
 
 /**
  * POST /api/stripe/sync-subscription
@@ -14,32 +20,14 @@ import Stripe from "stripe";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const session = await requireAuth();
 
     const { sessionId } = await request.json();
     if (!sessionId) {
-      return NextResponse.json(
-        { error: "Session ID required" },
-        { status: 400 }
-      );
+      throw new ValidationError("Session ID required");
     }
 
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
-      );
-    }
+    const customer = await getCustomerOrThrow(session.user.id);
 
     // Retrieve checkout session from Stripe
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
@@ -65,9 +53,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const stripeSubscription = await stripe.subscriptions.retrieve(
+    const stripeSubscription = (await stripe.subscriptions.retrieve(
       subscriptionId
-    );
+    )) as unknown as Stripe.Subscription & {
+      current_period_start: number;
+      current_period_end: number;
+      trial_start: number | null;
+      trial_end: number | null;
+    };
 
     // Access subscription properties - they exist natively on Stripe.Subscription
     const currentPeriodStart = stripeSubscription.current_period_start;
@@ -181,31 +174,97 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Generate and store license key using proper generator
-    const licenseKeyValue = generateLicenseKey(plan.id, customer.id);
+    // Plan code mapping for license key prefix
+    const PLAN_CODES: Record<string, string> = {
+      basic: "BAS",
+      professional: "PRO",
+      enterprise: "ENT",
+    };
 
-    // Create license key
-    await db.insert(licenseKeys).values({
-      customerId: customer.id,
-      subscriptionId: newSubscription.id,
-      licenseKey: licenseKeyValue,
-      maxTerminals: plan.features.maxTerminals,
-      activationCount: 0,
-      version: "2.0",
-      issuedAt: new Date(),
-      isActive: true,
-    });
+    // Check for existing license key
+    const [existingLicense] = await db
+      .select()
+      .from(licenseKeys)
+      .where(eq(licenseKeys.customerId, customer.id))
+      .orderBy(desc(licenseKeys.createdAt))
+      .limit(1);
 
-    return NextResponse.json({
+    let licenseKeyValue: string;
+
+    // Determine if we need a new license based on plan tier change
+    const currentPlanCode = PLAN_CODES[plan.id] || "BAS";
+    const existingPlanCode = existingLicense?.licenseKey?.split("-")[1]; // e.g., "AUR-BAS-V2-xxx" -> "BAS"
+    const planTierChanged =
+      existingLicense && existingPlanCode !== currentPlanCode;
+
+    if (existingLicense && !existingLicense.revokedAt && !planTierChanged) {
+      // Reuse existing license - same plan tier, just billing cycle or reactivation
+      licenseKeyValue = existingLicense.licenseKey;
+
+      await db
+        .update(licenseKeys)
+        .set({
+          subscriptionId: newSubscription.id,
+          maxTerminals: plan.features.maxTerminals,
+          isActive: true,
+        })
+        .where(eq(licenseKeys.id, existingLicense.id));
+
+      console.log(
+        `[Sync] Reusing existing license: ${licenseKeyValue.substring(
+          0,
+          15
+        )}...`
+      );
+    } else {
+      // Generate NEW license if:
+      // - No previous license exists
+      // - Previous license was revoked
+      // - Plan TIER changed (BAS → PRO, PRO → ENT, etc.)
+
+      // Deactivate old license if plan tier changed
+      if (existingLicense && planTierChanged) {
+        await db
+          .update(licenseKeys)
+          .set({
+            isActive: false,
+            revokedAt: new Date(),
+            revocationReason: `Upgraded to ${plan.id} plan`,
+          })
+          .where(eq(licenseKeys.id, existingLicense.id));
+
+        console.log(
+          `[Sync] Deactivated old license due to plan tier change: ${existingPlanCode} → ${currentPlanCode}`
+        );
+      }
+
+      licenseKeyValue = generateLicenseKey(plan.id, customer.id);
+
+      await db.insert(licenseKeys).values({
+        customerId: customer.id,
+        subscriptionId: newSubscription.id,
+        licenseKey: licenseKeyValue,
+        maxTerminals: plan.features.maxTerminals,
+        activationCount: 0,
+        version: "2.0",
+        issuedAt: new Date(),
+        isActive: true,
+      });
+
+      console.log(
+        `[Sync] Generated new license: ${licenseKeyValue.substring(
+          0,
+          15
+        )}... (plan: ${plan.id})`
+      );
+    }
+
+    return successResponse({
       message: "Subscription synced successfully",
       subscription: newSubscription,
       licenseKey: licenseKeyValue,
     });
   } catch (error) {
-    console.error("Sync subscription error:", error);
-    return NextResponse.json(
-      { error: "Failed to sync subscription" },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to sync subscription");
   }
 }

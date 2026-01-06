@@ -1,24 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePasswordResetToken } from "@/lib/auth-utils";
 import { getUserByEmail } from "@/lib/auth-utils";
-import { sendVerificationEmail } from "@/lib/email";
-import nodemailer from "nodemailer";
-
-function createTransporter() {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    throw new Error(
-      "GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required"
-    );
-  }
-
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
-}
+import { createTransporter, getFromEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {

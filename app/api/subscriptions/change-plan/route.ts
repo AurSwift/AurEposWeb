@@ -1,13 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import {
-  subscriptions,
-  customers,
-  licenseKeys,
-  subscriptionChanges,
-} from "@/lib/db/schema";
+import { subscriptions, licenseKeys, subscriptionChanges } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getStripePriceId,
@@ -16,14 +10,18 @@ import {
   type BillingCycle,
 } from "@/lib/stripe/plans";
 import { createProrationPayment } from "@/lib/db/payment-helpers";
-import Stripe from "stripe";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import {
+  successResponse,
+  handleApiError,
+  ValidationError,
+} from "@/lib/api/response-helpers";
+import { isValidPlanId, isUpgrade as checkIsUpgrade } from "@/lib/stripe/plan-utils";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const session = await requireAuth();
 
     const { subscriptionId, newPlanId, newBillingCycle } =
       (await request.json()) as {
@@ -33,30 +31,15 @@ export async function POST(request: NextRequest) {
       };
 
     if (!subscriptionId || !newPlanId) {
-      return NextResponse.json(
-        { error: "Subscription ID and new plan ID are required" },
-        { status: 400 }
-      );
+      throw new ValidationError("Subscription ID and new plan ID are required");
     }
 
     // Validate plan ID
-    if (!["basic", "professional", "enterprise"].includes(newPlanId)) {
-      return NextResponse.json({ error: "Invalid plan ID" }, { status: 400 });
+    if (!isValidPlanId(newPlanId)) {
+      throw new ValidationError("Invalid plan ID");
     }
 
-    // Get customer
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, session.user.id))
-      .limit(1);
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: "Customer not found" },
-        { status: 404 }
-      );
-    }
+    const customer = await getCustomerOrThrow(session.user.id);
 
     // Get current subscription
     const [currentSub] = await db
@@ -71,10 +54,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!currentSub || !currentSub.stripeSubscriptionId) {
-      return NextResponse.json(
-        { error: "Subscription not found" },
-        { status: 404 }
-      );
+      throw new ValidationError("Subscription not found");
     }
 
     // Determine billing cycle (use existing if not provided)
@@ -119,9 +99,11 @@ export async function POST(request: NextRequest) {
     const invoiceUrl: string | null = null;
 
     // Determine if this is an upgrade or downgrade
-    const currentPrice = parseFloat(currentSub.price || "0");
-    const isUpgrade = newPrice > currentPrice;
-    const changeType = isUpgrade ? "plan_upgrade" : "plan_downgrade";
+    const isUpgradeChange =
+      currentSub.planId && isValidPlanId(currentSub.planId)
+        ? checkIsUpgrade(currentSub.planId as PlanId, newPlanId)
+        : newPrice > parseFloat(currentSub.price || "0");
+    const changeType = isUpgradeChange ? "plan_upgrade" : "plan_downgrade";
 
     // Update database in a transaction
     await db.transaction(async (tx) => {
@@ -183,9 +165,9 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
-      message: `Successfully ${isUpgrade ? "upgraded" : "downgraded"} to ${
+      message: `Successfully ${isUpgradeChange ? "upgraded" : "downgraded"} to ${
         newPlan.name
       } plan`,
       subscription: {
@@ -196,13 +178,6 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Plan change error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to change plan",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to change plan");
   }
 }

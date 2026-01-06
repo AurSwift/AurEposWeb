@@ -7,23 +7,25 @@ import {
   customers,
 } from "@/lib/db/schema";
 import { eq, and, sql, count } from "drizzle-orm";
+import {
+  CODE_TO_PLAN,
+  LICENSE_KEY_FORMAT,
+  MAX_DEACTIVATIONS,
+  HEARTBEAT_TIMEOUT_MS,
+} from "./constants";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-// License key format: AUR-{PlanCode}-V2-{Random8Char}-{HMACSignature8Char}
-const LICENSE_KEY_PATTERN = /^AUR-(BAS|PRO|ENT)-V2-[A-Z0-9]{8}-[A-Z0-9]{8}$/;
+// License key format (from constants)
+const LICENSE_KEY_PATTERN = LICENSE_KEY_FORMAT;
 
 // HMAC secret for license key validation (must be set in environment)
 const LICENSE_HMAC_SECRET = process.env.LICENSE_HMAC_SECRET;
 
-// Plan codes mapping
-const PLAN_CODES: Record<string, string> = {
-  BAS: "basic",
-  PRO: "professional",
-  ENT: "enterprise",
-};
+// Plan codes mapping (from constants)
+const PLAN_CODES = CODE_TO_PLAN;
 
 // Grace period for initial activation (24 hours) - allows rebinding within this window
 const ACTIVATION_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
@@ -104,28 +106,11 @@ export interface DeactivationResult {
 // CRYPTOGRAPHIC FUNCTIONS
 // ============================================================================
 
-/**
- * Calculate HMAC signature for license key validation
- */
-function calculateHmacSignature(baseKey: string, customerId: string): string {
-  if (!LICENSE_HMAC_SECRET) {
-    throw new Error("LICENSE_HMAC_SECRET environment variable is required");
-  }
+// Import shared cryptographic functions
+import { calculateHmacSignature, hashMachineId } from "./crypto";
 
-  return crypto
-    .createHmac("sha256", LICENSE_HMAC_SECRET)
-    .update(`${baseKey}-${customerId}`)
-    .digest("hex")
-    .substring(0, 8)
-    .toUpperCase();
-}
-
-/**
- * Hash machine ID for storage (we never store raw machine IDs)
- */
-export function hashMachineId(machineId: string): string {
-  return crypto.createHash("sha256").update(machineId).digest("hex");
-}
+// Export hashMachineId for external use
+export { hashMachineId };
 
 /**
  * Mask license key for logging (security)
@@ -512,7 +497,7 @@ export async function validateLicense(
   if (!license.isActive || license.revokedAt) {
     return {
       success: false,
-      message: "License key is not active",
+      message: `License key has been revoked${license.revocationReason ? `: ${license.revocationReason}` : ""}`,
     };
   }
 
@@ -666,28 +651,66 @@ export async function processHeartbeat(
 
     if (subscription) {
       subscriptionStatus = subscription.status || "active";
+      const now = new Date();
+
+      // Check if currently in trial period
+      const isInTrial =
+        subscriptionStatus === "trialing" &&
+        subscription.trialEnd &&
+        subscription.trialEnd > now;
 
       if (subscriptionStatus === "cancelled") {
-        // FIX: Use subscription cancellation date, not last heartbeat
-        // This prevents users from extending grace period by not heartbeating
-        const cancellationDate = subscription.canceledAt
-          ? new Date(subscription.canceledAt)
-          : new Date(); // If no cancellation date, assume now
+        // TRIAL CANCELLATION: If cancelled during trial, allow access until trial end
+        if (isInTrial && subscription.trialEnd) {
+          const trialGracePeriodEnd = new Date(
+            subscription.trialEnd.getTime() +
+              OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+          );
 
-        const gracePeriodEnd = new Date(
-          cancellationDate.getTime() +
-            OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
-        );
-
-        const now = new Date();
-        if (now > gracePeriodEnd) {
-          shouldDisable = true;
-          gracePeriodRemaining = 0;
+          if (now > trialGracePeriodEnd) {
+            shouldDisable = true;
+            gracePeriodRemaining = 0;
+          } else {
+            gracePeriodRemaining =
+              trialGracePeriodEnd.getTime() - now.getTime();
+          }
         } else {
-          gracePeriodRemaining = gracePeriodEnd.getTime() - now.getTime();
+          // PAID SUBSCRIPTION CANCELLATION: Use normal grace period from cancellation date
+          const cancellationDate = subscription.canceledAt
+            ? new Date(subscription.canceledAt)
+            : new Date();
+
+          const gracePeriodEnd = new Date(
+            cancellationDate.getTime() +
+              OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+          );
+
+          if (now > gracePeriodEnd) {
+            shouldDisable = true;
+            gracePeriodRemaining = 0;
+          } else {
+            gracePeriodRemaining = gracePeriodEnd.getTime() - now.getTime();
+          }
+        }
+      } else if (subscriptionStatus === "trialing") {
+        // TRIAL PERIOD: Check if trial has expired
+        if (subscription.trialEnd && now > subscription.trialEnd) {
+          // Trial ended - apply grace period
+          const trialGracePeriodEnd = new Date(
+            subscription.trialEnd.getTime() +
+              OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+          );
+
+          if (now > trialGracePeriodEnd) {
+            shouldDisable = true;
+            gracePeriodRemaining = 0;
+          } else {
+            gracePeriodRemaining =
+              trialGracePeriodEnd.getTime() - now.getTime();
+          }
         }
       } else if (subscriptionStatus === "past_due") {
-        // Past due gets shorter grace period (3 days)
+        // PAST DUE: Shorter grace period (3 days) for payment failures
         const lastPaymentAttempt = subscription.currentPeriodEnd
           ? new Date(subscription.currentPeriodEnd)
           : new Date();
@@ -696,7 +719,6 @@ export async function processHeartbeat(
           lastPaymentAttempt.getTime() + 3 * 24 * 60 * 60 * 1000
         );
 
-        const now = new Date();
         if (now > pastDueGracePeriodEnd) {
           shouldDisable = true;
           gracePeriodRemaining = 0;

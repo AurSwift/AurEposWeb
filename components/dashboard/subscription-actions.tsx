@@ -379,36 +379,48 @@ export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
                 value={cancelType}
                 onValueChange={(value) => setCancelType(value as CancelType)}
               >
-                <div className="flex items-start space-x-2 p-3 border rounded-md">
+                <Label
+                  htmlFor="end_of_period"
+                  className={`flex items-start space-x-2 p-3 border rounded-md cursor-pointer transition-colors hover:bg-accent/20 ${
+                    cancelType === "end_of_period"
+                      ? "border-primary/30 bg-primary/5"
+                      : ""
+                  }`}
+                >
                   <RadioGroupItem
                     value="end_of_period"
                     id="end_of_period"
                     className="mt-1"
                   />
                   <div className="flex-1">
-                    <Label htmlFor="end_of_period" className="font-medium">
+                    <div className="font-medium">
                       Cancel at end of billing period
-                    </Label>
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       You'll retain access until your current period ends
                     </p>
                   </div>
-                </div>
-                <div className="flex items-start space-x-2 p-3 border rounded-md border-destructive/50">
+                </Label>
+                <Label
+                  htmlFor="immediately"
+                  className={`flex items-start space-x-2 p-3 border rounded-md cursor-pointer transition-colors hover:bg-destructive/5 ${
+                    cancelType === "immediately"
+                      ? "border-destructive/30 bg-destructive/5"
+                      : ""
+                  }`}
+                >
                   <RadioGroupItem
                     value="immediately"
                     id="immediately"
                     className="mt-1"
                   />
                   <div className="flex-1">
-                    <Label htmlFor="immediately" className="font-medium">
-                      Cancel immediately
-                    </Label>
+                    <div className="font-medium">Cancel immediately</div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Access ends now. No refund for remaining time.
                     </p>
                   </div>
-                </div>
+                </Label>
               </RadioGroup>
               <div className="space-y-2">
                 <Label htmlFor="reason">

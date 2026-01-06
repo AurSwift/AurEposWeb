@@ -41,7 +41,7 @@ export const subscriptions = pgTable(
       .references(() => customers.id)
       .notNull(),
     planId: varchar("plan_id", { length: 100 }), // Reference to plan catalog (e.g., 'basic', 'professional', 'enterprise')
-    planType: varchar("plan_type", { length: 20 }), // 'basic', 'professional', 'enterprise' (deprecated, use planId)
+    planType: varchar("plan_type", { length: 20 }), // DEPRECATED: Use planId instead. Kept for backward compatibility with existing data.
     billingCycle: varchar("billing_cycle", { length: 10 }), // 'monthly', 'annual'
     price: decimal("price", { precision: 10, scale: 2 }),
     status: varchar("status", { length: 20 }), // 'active', 'past_due', 'cancelled', 'trialing', 'paused'

@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 interface BillingToggleProps {
   billingCycle: "monthly" | "annual";
   onCycleChange: (cycle: "monthly" | "annual") => void;
+  annualDiscountPercent?: number;
 }
 
 export function BillingToggle({
   billingCycle,
   onCycleChange,
+  annualDiscountPercent,
 }: BillingToggleProps) {
   return (
     <div className="flex items-center justify-center gap-2 p-1.5 bg-muted/50 rounded-lg border border-border">
@@ -25,6 +27,7 @@ export function BillingToggle({
             ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
             : "text-muted-foreground hover:text-foreground hover:bg-muted"
         )}
+        aria-label="Switch to monthly billing"
       >
         Monthly
       </Button>
@@ -39,18 +42,21 @@ export function BillingToggle({
             ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
             : "text-muted-foreground hover:text-foreground hover:bg-muted"
         )}
+        aria-label={`Switch to annual billing${annualDiscountPercent ? ` and save ${annualDiscountPercent}%` : ""}`}
       >
         Annual
-        <span
-          className={cn(
-            "ml-2 text-xs font-bold px-1.5 py-0.5 rounded",
-            billingCycle === "annual"
-              ? "bg-primary-foreground/20 text-primary-foreground"
-              : "bg-green-500/20 text-green-700 dark:text-green-400"
-          )}
-        >
-          Save 20%
-        </span>
+        {annualDiscountPercent && annualDiscountPercent > 0 && (
+          <span
+            className={cn(
+              "ml-2 text-xs font-bold px-1.5 py-0.5 rounded",
+              billingCycle === "annual"
+                ? "bg-primary-foreground/20 text-primary-foreground"
+                : "bg-green-500/20 text-green-700 dark:text-green-400"
+            )}
+          >
+            Save {annualDiscountPercent}%
+          </span>
+        )}
       </Button>
     </div>
   );

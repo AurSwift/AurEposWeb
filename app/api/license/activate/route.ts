@@ -25,8 +25,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const { licenseKey, machineIdHash, terminalName, appVersion, location } =
-      body;
+    const {
+      licenseKey,
+      machineIdHash,
+      terminalName,
+      appVersion,
+      ipAddress,
+      location,
+    } = body;
 
     // Validate required fields
     if (!licenseKey) {
@@ -43,13 +49,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process activation
+    // Process activation with provided IP or fallback to client IP
     const result = await activateLicense({
       licenseKey,
       machineIdHash,
       terminalName: terminalName || "Terminal",
       appVersion: appVersion || "unknown",
-      ipAddress: clientIP,
+      ipAddress: ipAddress || clientIP,
       location,
     });
 

@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { getPlans } from "@/lib/stripe/plans";
+import { NextRequest, NextResponse } from "next/server";
+import { getPlans, clearPlansCache } from "@/lib/stripe/plans";
+import { applyRateLimit, addRateLimitHeaders, getClientIP } from "@/lib/rate-limit";
 import type { Plan } from "@/lib/stripe/plans";
 
 // Client-safe Plan type (without Stripe Price IDs and Product ID)
@@ -9,8 +10,22 @@ type ClientPlan = Omit<
 >;
 
 // Return plans fetched from Stripe (with caching)
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Apply rate limiting
+  const clientIP = getClientIP(request);
+  const rateLimit = applyRateLimit("plans", clientIP);
+
+  if (rateLimit.blocked) {
+    return rateLimit.response;
+  }
+
   try {
+    // Check for cache refresh header
+    const forceRefresh = request.headers.get("x-force-refresh") === "true";
+    if (forceRefresh) {
+      clearPlansCache();
+    }
+
     const plans = await getPlans();
 
     // Remove sensitive Stripe IDs for client-side
@@ -25,9 +40,14 @@ export async function GET() {
       clientPlans[planId] = clientPlan;
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       plans: clientPlans,
     });
+
+    // Add rate limit headers
+    addRateLimitHeaders(response.headers, "plans", rateLimit.result);
+
+    return response;
   } catch (error) {
     console.error("Error fetching plans:", error);
     return NextResponse.json(
