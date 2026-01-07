@@ -11,11 +11,11 @@ import { eq } from "drizzle-orm";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { licenseId: string } }
+  { params }: { params: Promise<{ licenseId: string }> }
 ) {
   try {
     await requireAdmin();
-    const { licenseId } = params;
+    const { licenseId } = await params;
     const body = await request.json();
     const { reason } = body;
 

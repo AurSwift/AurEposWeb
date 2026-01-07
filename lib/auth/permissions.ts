@@ -5,7 +5,7 @@ import {
   rolePermissions,
   userPermissions,
 } from "@/lib/db/schema";
-import { eq, and, or, gt } from "drizzle-orm";
+import { eq, and, or, gt, isNull } from "drizzle-orm";
 
 /**
  * Get all permissions for a user based on their role and custom permissions
@@ -37,7 +37,7 @@ export async function getUserPermissions(
       and(
         eq(userPermissions.userId, userId),
         or(
-          eq(userPermissions.expiresAt, null),
+          isNull(userPermissions.expiresAt),
           gt(userPermissions.expiresAt, new Date())
         )
       )

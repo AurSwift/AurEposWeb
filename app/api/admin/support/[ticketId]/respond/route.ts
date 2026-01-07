@@ -11,11 +11,11 @@ import { eq } from "drizzle-orm";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
     const session = await requireInternalUser();
-    const { ticketId } = params;
+    const { ticketId } = await params;
     const body = await request.json();
     const { response, status } = body;
 
@@ -62,11 +62,11 @@ export async function POST(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
     await requireInternalUser();
-    const { ticketId } = params;
+    const { ticketId } = await params;
     const body = await request.json();
     const { status } = body;
 

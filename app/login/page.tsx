@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -18,7 +18,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -217,5 +217,34 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
+        <Card className="w-full max-w-md shadow-xl border-border/50">
+          <CardHeader className="space-y-1 text-center pb-6">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Image
+                src="/logo.png"
+                alt="Aurswift Logo"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-cover"
+                priority
+              />
+              <CardTitle className="text-3xl font-bold">Aurswift</CardTitle>
+            </div>
+            <CardDescription className="text-base">
+              Loading...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

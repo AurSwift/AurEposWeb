@@ -7,7 +7,7 @@
 
 import { db } from "@/lib/db";
 import { permissions, rolePermissions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 // Define all permissions
 const permissionsList = [
@@ -292,8 +292,10 @@ async function seedPermissions() {
           .select()
           .from(rolePermissions)
           .where(
-            eq(rolePermissions.role, role),
-            eq(rolePermissions.permissionId, permission.id)
+            and(
+              eq(rolePermissions.role, role),
+              eq(rolePermissions.permissionId, permission.id)
+            )
           )
           .limit(1);
 

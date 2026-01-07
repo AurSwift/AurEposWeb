@@ -124,7 +124,8 @@ export async function createPaymentFromInvoice(
     period_start: number;
     period_end: number;
   },
-  status: "completed" | "failed" = "completed"
+  status: "completed" | "failed" = "completed",
+  tx?: DbOrTransaction
 ): Promise<typeof payments.$inferSelect> {
   const amount = status === "completed"
     ? (invoice.amount_paid || 0) / 100
@@ -142,7 +143,7 @@ export async function createPaymentFromInvoice(
     billingPeriodStart: new Date(invoice.period_start * 1000),
     billingPeriodEnd: new Date(invoice.period_end * 1000),
     paidAt: status === "completed" ? new Date() : null,
-  });
+  }, tx);
 }
 
 /**
