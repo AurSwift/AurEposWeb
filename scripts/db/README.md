@@ -6,7 +6,8 @@ This folder contains all database-related scripts for the AuraSwift web applicat
 
 ### Core Database Operations
 
-- **`cleanup-database.ts`** - Clean all or selective database tables
+- **`cleanup-database.ts`** - Delete all records from tables (keeps structure)
+- **`drop-all-tables.ts`** - Drop all tables from database (⚠️ EXTREMELY DESTRUCTIVE)
 - **`count-db-records.ts`** - Display record counts for all tables
 - **`seed-demo-user.ts`** - Seed database with demo user data
 - **`create-admin-user.ts`** - Create a new admin user account
@@ -35,9 +36,13 @@ All scripts can be run from the `web` directory using the following commands:
 ### Using NPM Scripts (Recommended)
 
 ```bash
-# Database cleanup (with safety features)
+# Database cleanup (deletes records, keeps structure)
 bun run db:cleanup                  # Interactive cleanup
 bun run db:cleanup:dry-run          # Preview mode (safe)
+
+# Drop all tables (⚠️ EXTREMELY DESTRUCTIVE - removes structure)
+bun run db:drop-tables:dry-run      # Preview what would be dropped
+bun run db:drop-tables              # Drop all tables (requires confirmation)
 
 # Database monitoring
 bun run db:count                    # Count all records

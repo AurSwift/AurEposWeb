@@ -7,7 +7,8 @@ This directory contains utility scripts for managing the AuraSwift database. The
 ```
 scripts/
 ├── db/                          # Database-related scripts
-│   ├── cleanup-database.ts      # Clean database tables
+│   ├── cleanup-database.ts      # Delete records (keeps structure)
+│   ├── drop-all-tables.ts       # Drop all tables (⚠️ EXTREME)
 │   ├── count-db-records.ts      # Count table records
 │   ├── seed-demo-user.ts        # Seed demo user
 │   ├── create-admin-user.ts     # Create admin user
@@ -18,9 +19,11 @@ scripts/
 │   ├── fix-basic-plan-price.ts  # Fix plan prices
 │   ├── fix-stripe-metadata.ts   # Fix Stripe metadata
 │   ├── apply-role-migration.ts  # Apply role migration
-│   └── apply-employees-migration.ts # Apply employees migration
+│   ├── apply-employees-migration.ts # Apply employees migration
+│   └── README.md                # Quick reference for DB scripts
 ├── generate-demo-password.ts    # Generate password hash
-└── README.md                    # This file
+├── QUICK_REFERENCE.md           # Quick command reference
+└── README.md                    # This file (comprehensive guide)
 ```
 
 ## 🚨 Safety First
@@ -38,7 +41,61 @@ Before running any destructive operations:
 
 ### 1. Database Cleanup Script (`db/cleanup-database.ts`)
 
-**Purpose**: Deletes all or selective records from database tables.
+**Purpose**: Deletes all or selective records from database tables (keeps table structure).
+
+### 2. Drop All Tables Script (`db/drop-all-tables.ts`)
+
+**Purpose**: Drops all table structures from the database (extremely destructive).
+
+**⚠️ WARNING**: This is even more destructive than cleanup - it removes the entire table structure, not just data!
+
+**Use Cases**:
+
+- Complete schema reset during development
+- Fix corrupted migrations
+- Start fresh with new schema
+- Clean slate before major schema changes
+
+#### Basic Usage
+
+```bash
+# Preview what would be dropped (ALWAYS RUN THIS FIRST!)
+pnpm db:drop-tables:dry-run
+
+# Interactive drop with confirmation
+pnpm db:drop-tables
+
+# Force drop with CASCADE (for tables with dependencies)
+pnpm db:drop-tables --cascade
+
+# Skip confirmation (very dangerous!)
+pnpm db:drop-tables --force
+```
+
+#### After Dropping Tables
+
+You'll need to recreate the schema:
+
+```bash
+# Option 1: Push schema from code (recommended for dev)
+pnpm db:push
+
+# Option 2: Run migrations
+pnpm db:migrate
+
+# Option 3: Then seed with demo data
+pnpm tsx scripts/db/seed-demo-user.ts
+```
+
+#### Safety Features
+
+- ✅ **Requires typing "DROP ALL TABLES"** for confirmation
+- ✅ **Production detection** - Blocks production databases
+- ✅ **Dry run mode** - Preview before executing
+- ✅ **CASCADE support** - Handle foreign key dependencies
+- ✅ **Post-drop verification** - Confirms tables were dropped
+
+### 3. Database Record Counter (`db/count-db-records.ts`)
 
 **Use Cases**:
 
@@ -158,8 +215,6 @@ pnpm db:cleanup --force
 ```
 
 ---
-
-### 2. Database Record Counter (`db/count-db-records.ts`)
 
 **Purpose**: Display count of records in all database tables without any risk of modification.
 
@@ -292,7 +347,26 @@ pnpm db:count --by-category
 
 ## 🔄 Common Workflows
 
-### Development Database Reset
+### Complete Database Reset (Schema + Data)
+
+```bash
+# 1. Preview what will be dropped
+pnpm db:drop-tables:dry-run
+
+# 2. Drop all tables
+pnpm db:drop-tables
+
+# 3. Recreate schema from code
+pnpm db:push
+
+# 4. Seed with demo data
+pnpm tsx scripts/db/seed-demo-user.ts
+
+# 5. Verify
+pnpm db:count
+```
+
+### Development Database Reset (Data Only)
 
 ```bash
 # 1. Check current state
@@ -535,16 +609,33 @@ When adding new tables to the schema:
 
 **Database Scripts** (in `scripts/db/`):
 
+**Core Operations:**
+
+- `cleanup-database.ts` - Delete all records (keeps table structure)
+- `drop-all-tables.ts` - Drop all tables (removes structure)
+- `count-db-records.ts` - Count records in all tables
+
+**User & Data Management:**
+
 - `create-admin-user.ts` - Create admin user account
 - `seed-demo-user.ts` - Seed demo user with subscription
+
+**License Management:**
+
 - `generate-test-license.ts` - Generate test license keys
-- `check-subscription.ts` - Check subscription status
 - `check-license.ts` - Check license keys
 - `migrate-license-keys.ts` - Migrate license keys
+
+**Subscription Management:**
+
+- `check-subscription.ts` - Check subscription status
+- `fix-basic-plan-price.ts` - Fix basic plan pricing
+- `fix-stripe-metadata.ts` - Fix Stripe metadata issues
+
+**Migrations:**
+
 - `apply-role-migration.ts` - Apply role migrations
 - `apply-employees-migration.ts` - Apply employees migration
-- `fix-stripe-metadata.ts` - Fix Stripe metadata issues
-- `fix-basic-plan-price.ts` - Fix basic plan pricing
 
 **Utility Scripts** (in `scripts/`):
 
@@ -570,11 +661,12 @@ pnpm db:studio
 
 ## 📚 Additional Resources
 
+- [Quick Reference Guide](./QUICK_REFERENCE.md) - Fast lookup for common commands
+- [DB Scripts Reference](./db/README.md) - Database scripts overview
+- [Database Schema](../lib/db/schema.ts) - Table definitions
+- [Database Configuration](../drizzle.config.ts) - Drizzle ORM config
 - [Drizzle ORM Documentation](https://orm.drizzle.team/)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [Database Schema](../lib/db/schema.ts)
-- [Database Configuration](../drizzle.config.ts)
-- [All Database Scripts](./db/)
 
 ---
 

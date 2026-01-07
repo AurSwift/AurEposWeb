@@ -4,7 +4,12 @@
  */
 
 import { db } from "../../lib/db";
-import { users, customers, subscriptions, licenseKeys } from "../../lib/db/schema";
+import {
+  users,
+  customers,
+  subscriptions,
+  licenseKeys,
+} from "../../lib/db/schema";
 import { hashPassword } from "../../lib/auth-utils";
 import { eq } from "drizzle-orm";
 import { generateLicenseKey } from "../../lib/license/generator";
@@ -33,6 +38,8 @@ async function seedDemoUser() {
         email: "demo@company.com",
         password: hashedPassword,
         name: "Acme Retail Co.",
+        role: "customer", // Set role to customer
+        emailVerified: new Date(), // Mark email as verified for demo user
       })
       .returning();
 
