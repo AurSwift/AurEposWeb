@@ -66,11 +66,13 @@ function VerifyEmailContent() {
       setEmail(data.email);
       setStatus("success");
 
-      // Redirect to plan selection after email verification
-      // In a real-world EPOS flow, users should select a plan before accessing the dashboard
+      // Redirect to login page with callback to plan selection
+      // User needs to log in to have an active session for the checkout flow
       setTimeout(() => {
-        router.push("/signup?step=plan&verified=true");
-      }, 2000);
+        router.push(
+          `/login?callbackUrl=${encodeURIComponent("/signup?step=plan&verified=true")}&verified=true&email=${encodeURIComponent(data.email)}`
+        );
+      }, 2500);
     } catch (err) {
       console.error("Verification error:", err);
       setError("Something went wrong. Please try again.");
@@ -200,8 +202,7 @@ function VerifyEmailContent() {
               <AlertDescription className="text-sm text-green-800 dark:text-green-200">
                 <strong>Email verified successfully!</strong>
                 <br />
-                Your email address has been verified. Redirecting to plan
-                selection...
+                Your email address has been verified. Redirecting to login page so you can continue with plan selection...
               </AlertDescription>
             </Alert>
           </CardContent>

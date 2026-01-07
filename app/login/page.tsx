@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,13 +16,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showVerifiedMessage, setShowVerifiedMessage] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Check if redirected from email verification
+  useEffect(() => {
+    const verified = searchParams?.get("verified");
+    const emailParam = searchParams?.get("email");
+    
+    if (verified === "true") {
+      setShowVerifiedMessage(true);
+      if (emailParam) {
+        setEmail(decodeURIComponent(emailParam));
+      }
+      // Hide message after 10 seconds
+      setTimeout(() => setShowVerifiedMessage(false), 10000);
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +62,15 @@ export default function LoginPage() {
 
       // Wait a moment for the session cookie to be set
       await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Check if there's a callback URL (e.g., from email verification)
+      const callbackUrl = searchParams?.get("callbackUrl");
+      
+      if (callbackUrl) {
+        // Redirect to the callback URL (e.g., plan selection)
+        window.location.href = decodeURIComponent(callbackUrl);
+        return;
+      }
 
       // Fetch session to check user role and redirect accordingly
       const response = await fetch("/api/auth/session");
@@ -92,16 +120,16 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Alert className="bg-accent/10 border-accent/30 backdrop-blur-sm">
-            <Info className="h-4 w-4 text-accent" />
-            <AlertDescription className="text-sm">
-              <strong>Demo Credentials:</strong>
-              <br />
-              Email: demo@company.com
-              <br />
-              Password: demo123
-            </AlertDescription>
-          </Alert>
+          {showVerifiedMessage && (
+            <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800 animate-in fade-in-50">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-sm text-green-800 dark:text-green-200">
+                <strong>Email verified successfully!</strong>
+                <br />
+                Please log in to continue with your plan selection.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {error && (
             <Alert variant="destructive" className="animate-in fade-in-50">
@@ -129,15 +157,29 @@ export default function LoginPage() {
               <Label htmlFor="password" className="text-sm font-medium">
                 Password
               </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-11"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-sm"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               <div className="text-right">
                 <Link
                   href="/forgot-password"

@@ -1,5 +1,10 @@
 # API Architecture Diagram - Dual Hybrid Approach
 
+**Last Updated:** January 6, 2025 (Post-Migration)  
+**Status:** ✅ Reflects current project structure after migration
+
+---
+
 ## Visual Overview
 
 ```
@@ -31,18 +36,20 @@
 │  │   (User-Initiated)             │   │   (Stripe-Initiated)            │  │
 │  ├────────────────────────────────┤   ├─────────────────────────────────┤  │
 │  │                                │   │                                 │  │
-│  │  /subscriptions/               │   │  /stripe/webhook/               │  │
+│  │  /subscriptions/               │   │  /stripe/webhooks/handler/     │  │
 │  │   ├── cancel/                  │   │   ├── checkout.completed        │  │
 │  │   ├── reactivate/              │   │   ├── subscription.updated      │  │
 │  │   ├── change-plan/             │   │   ├── subscription.deleted      │  │
 │  │   ├── current/                 │   │   ├── invoice.payment_succeeded │  │
-│  │   └── history/                 │   │   └── invoice.payment_failed    │  │
+│  │   ├── history/                 │   │   └── invoice.payment_failed    │  │
+│  │   ├── billing-history/         │   │                                 │  │
+│  │   └── plans/                   │   │                                 │  │
 │  │                                │   │                                 │  │
 │  │  /stripe/                      │   │                                 │  │
-│  │   ├── create-checkout/         │   │  Pattern: Event-driven          │  │
-│  │   ├── sync-subscription/       │   │  Async: 1-5 second delay        │  │
-│  │   ├── portal/                  │   │  Purpose: Background sync       │  │
-│  │   └── payment-method/          │   │                                 │  │
+│  │   ├── checkout/create/         │   │  Pattern: Event-driven          │  │
+│  │   ├── subscriptions/sync/      │   │  Async: 1-5 second delay        │  │
+│  │   ├── billing/portal/          │   │  Purpose: Background sync       │  │
+│  │   └── billing/payment-method/  │   │                                 │  │
 │  │                                │   └─────────────────────────────────┘  │
 │  │  Pattern: Request-Response     │                                        │
 │  │  Sync: ~250ms response         │                                        │
@@ -65,8 +72,6 @@
 │  │  /payments/             Payment tracking                             │   │
 │  │   └── history/          Payment records                              │   │
 │  │                                                                       │   │
-│  │  /plans/                Plan information                             │   │
-│  │  /billing-history/      Billing records                              │   │
 │  │  /terminals/            Terminal management                          │   │
 │  │                                                                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -136,6 +141,7 @@
 ```
 
 **Key Points:**
+
 - ✅ Immediate user feedback
 - ✅ Synchronous flow
 - ✅ Error handling visible to user
@@ -156,7 +162,7 @@
        │
        ▼
 ┌─────────────────────────────────────────┐
-│  POST /api/stripe/webhook               │
+│  POST /api/stripe/webhooks/handler      │
 │  (Webhook Handler)                      │
 │                                          │
 │  ┌────────────────────────────────────┐ │
@@ -189,6 +195,7 @@
 ```
 
 **Key Points:**
+
 - ✅ No user waiting
 - ✅ Asynchronous flow
 - ✅ Automatic processing
@@ -211,13 +218,15 @@
 │  ├── POST /subscriptions/reactivate      ⚡ Fast: 250ms           │
 │  ├── POST /subscriptions/change-plan     ⚡ Fast: 250ms           │
 │  ├── GET  /subscriptions/current         ⚡ Fast: 100ms           │
-│  └── GET  /subscriptions/history         ⚡ Fast: 150ms           │
+│  ├── GET  /subscriptions/history         ⚡ Fast: 150ms           │
+│  ├── GET  /subscriptions/billing-history ⚡ Fast: 150ms           │
+│  └── GET  /subscriptions/plans           ⚡ Fast: 100ms           │
 │                                                                    │
 │  Category: Stripe                                                  │
-│  ├── POST /stripe/create-checkout        ⚡ Fast: 300ms           │
-│  ├── POST /stripe/sync-subscription      ⚡ Fast: 400ms           │
-│  ├── POST /stripe/portal                 ⚡ Fast: 200ms           │
-│  └── POST /stripe/payment-method         ⚡ Fast: 250ms           │
+│  ├── POST /stripe/checkout/create        ⚡ Fast: 300ms           │
+│  ├── POST /stripe/subscriptions/sync     ⚡ Fast: 400ms           │
+│  ├── POST /stripe/billing/portal         ⚡ Fast: 200ms           │
+│  └── GET  /stripe/billing/payment-method  ⚡ Fast: 250ms           │
 │                                                                    │
 │  Category: License                                                 │
 │  ├── POST /license/activate              ⚡ Fast: 300ms           │
@@ -232,7 +241,7 @@
 │                    (Webhook - Background)                          │
 ├────────────────────────────────────────────────────────────────────┤
 │                                                                    │
-│  Route: /stripe/webhook                                            │
+│  Route: /stripe/webhooks/handler                                   │
 │                                                                    │
 │  Events:                                                           │
 │  ├── checkout.session.completed          🕒 Delay: 1-5s          │
@@ -271,6 +280,7 @@ User Action → Stripe API → Database Update → User Feedback
 ```
 
 **Benefits:**
+
 - ✅ Immediate feedback
 - ✅ Error handling
 - ✅ Atomic transactions
@@ -287,6 +297,7 @@ Stripe Event → Webhook → Database Update → SSE Notification → Desktop
 ```
 
 **Benefits:**
+
 - ✅ No user blocking
 - ✅ Reliable delivery
 - ✅ Retry mechanism
@@ -309,7 +320,7 @@ Stripe Event → Webhook → Database Update → SSE Notification → Desktop
 │  ├── All /subscriptions/* routes                            │
 │  ├── All /license/* routes                                  │
 │  ├── All /payments/* routes                                 │
-│  └── All /plans routes                                      │
+│  └── All /stripe/* routes (except webhooks)                 │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
                           ▼
@@ -421,6 +432,6 @@ Your API architecture demonstrates:
 
 ---
 
-**Last Updated:** January 6, 2025  
-**Document Type:** Architecture Diagram
-
+**Last Updated:** January 6, 2025 (Post-Migration Update)  
+**Document Type:** Architecture Diagram  
+**Migration Status:** ✅ Complete - Reflects current project structure

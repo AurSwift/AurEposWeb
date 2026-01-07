@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { PlanCard } from "@/components/pricing/plan-card";
 import { BillingToggle } from "@/components/pricing/billing-toggle";
 import { type PlanId, type BillingCycle, type Plan } from "@/lib/stripe/plans";
@@ -33,6 +34,7 @@ type Step = "account" | "verification" | "plan" | "billing";
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const [step, setStep] = useState<Step>("account");
   const [plans, setPlans] = useState<Record<PlanId, Plan>>(
     {} as Record<PlanId, Plan>
@@ -50,6 +52,8 @@ function SignupPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
+  const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Fetch plans from API
   useEffect(() => {
@@ -86,12 +90,19 @@ function SignupPageContent() {
     const verified = searchParams?.get("verified");
     if (stepParam === "plan" && verified === "true") {
       setStep("plan");
-      setShowVerificationSuccess(true);
       setError(""); // Clear any errors
-      // Hide success message after 5 seconds
-      setTimeout(() => setShowVerificationSuccess(false), 5000);
+      
+      // If user is logged in, show welcome message instead of verification message
+      if (session?.user) {
+        setShowWelcomeMessage(true);
+        setTimeout(() => setShowWelcomeMessage(false), 5000);
+      } else {
+        // Only show verification message if not logged in (shouldn't happen in normal flow)
+        setShowVerificationSuccess(true);
+        setTimeout(() => setShowVerificationSuccess(false), 5000);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, session]);
 
   // Step 1: Account Creation
   const handleAccountSubmit = async (e: React.FormEvent) => {
@@ -266,18 +277,32 @@ function SignupPageContent() {
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Create a strong password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required
-                  minLength={8}
-                  className="h-11"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    required
+                    minLength={8}
+                    className="h-11 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-sm"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Must be at least 8 characters
                 </p>
@@ -360,7 +385,17 @@ function SignupPageContent() {
             </p>
           </div>
 
-          {showVerificationSuccess && (
+          {showWelcomeMessage && session?.user && (
+            <Alert className="mb-8 max-w-2xl mx-auto animate-in fade-in-50 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+              <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Welcome, {session.user.name || session.user.email}!</strong> Please select a
+                plan to continue.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {showVerificationSuccess && !session?.user && (
             <Alert className="mb-8 max-w-2xl mx-auto animate-in fade-in-50 bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertDescription className="text-sm text-green-800 dark:text-green-200">
