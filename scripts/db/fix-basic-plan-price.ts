@@ -3,8 +3,8 @@
  * Run with: pnpm tsx scripts/fix-basic-plan-price.ts
  */
 
-import { db } from "../lib/db";
-import { subscriptions } from "../lib/db/schema";
+import { db } from "../../lib/db";
+import { subscriptions } from "../../lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 async function fixBasicPlanPrices() {

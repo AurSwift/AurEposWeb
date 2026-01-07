@@ -6,11 +6,11 @@
  * Run with: pnpm tsx scripts/migrate-license-keys.ts
  */
 
-import { db } from "../lib/db";
-import { licenseKeys, subscriptions } from "../lib/db/schema";
+import { db } from "../../lib/db";
+import { licenseKeys, subscriptions } from "../../lib/db/schema";
 import { eq } from "drizzle-orm";
-import { generateLicenseKey } from "../lib/license/generator";
-import type { PlanId } from "../lib/stripe/plans";
+import { generateLicenseKey } from "../../lib/license/generator";
+import type { PlanId } from "../../lib/stripe/plans";
 
 async function migrateLicenseKeys() {
   console.log("\n🔄 Starting license key migration...\n");

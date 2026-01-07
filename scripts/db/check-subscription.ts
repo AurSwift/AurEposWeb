@@ -1,5 +1,5 @@
-import { db } from "../lib/db";
-import { subscriptions, customers, users } from "../lib/db/schema";
+import { db } from "../../lib/db";
+import { subscriptions, customers, users } from "../../lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const [customer] = await db

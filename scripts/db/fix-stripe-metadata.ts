@@ -12,7 +12,7 @@ import Stripe from "stripe";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-config({ path: resolve(__dirname, "../.env.local") });
+config({ path: resolve(__dirname, "../../.env.local") });
 
 // Initialize Stripe after loading env
 if (!process.env.STRIPE_SECRET_KEY) {

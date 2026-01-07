@@ -3,11 +3,11 @@
  * Run with: pnpm tsx scripts/seed-demo-user.ts
  */
 
-import { db } from "../lib/db";
-import { users, customers, subscriptions, licenseKeys } from "../lib/db/schema";
-import { hashPassword } from "../lib/auth-utils";
+import { db } from "../../lib/db";
+import { users, customers, subscriptions, licenseKeys } from "../../lib/db/schema";
+import { hashPassword } from "../../lib/auth-utils";
 import { eq } from "drizzle-orm";
-import { generateLicenseKey } from "../lib/license/generator";
+import { generateLicenseKey } from "../../lib/license/generator";
 
 async function seedDemoUser() {
   try {

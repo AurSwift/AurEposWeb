@@ -1,8 +1,8 @@
 /**
  * Quick script to check license keys in the database
  */
-import { db } from "../lib/db";
-import { licenseKeys, activations } from "../lib/db/schema";
+import { db } from "../../lib/db";
+import { licenseKeys, activations } from "../../lib/db/schema";
 import { eq, like } from "drizzle-orm";
 
 async function checkLicense() {
