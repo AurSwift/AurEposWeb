@@ -24,7 +24,7 @@ export function PaymentMethodCard() {
   useEffect(() => {
     async function fetchPaymentMethod() {
       try {
-        const response = await fetch("/api/stripe/payment-method");
+        const response = await fetch("/api/stripe/billing/payment-method");
         const data = await response.json();
 
         if (response.ok && data.paymentMethod) {
@@ -41,7 +41,7 @@ export function PaymentMethodCard() {
 
   const handleUpdatePaymentMethod = async () => {
     try {
-      const response = await fetch("/api/stripe/portal", { method: "POST" });
+      const response = await fetch("/api/stripe/billing/portal", { method: "POST" });
       const data = await response.json();
 
       if (data.url) {

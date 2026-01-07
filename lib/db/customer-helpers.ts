@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
-import { customers } from "@/lib/db/schema";
+import { customers, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { Customer } from "@/lib/db/schema";
+import type { Session } from "next-auth";
 
 /**
  * Custom error for customer not found scenarios
@@ -109,4 +110,54 @@ export async function getCustomerById(
 export async function customerExists(userId: string): Promise<boolean> {
   const customer = await getCustomerByUserId(userId);
   return customer !== null;
+}
+
+/**
+ * Get customer from session
+ * Only works for customer role users
+ * Internal users (admin, support, developer) don't have customer records
+ *
+ * @param session - User session
+ * @returns Customer object or null
+ * @throws Error if session is invalid
+ */
+export async function getCustomerFromSession(
+  session: Session
+): Promise<Customer | null> {
+  if (!session?.user?.id) {
+    throw new Error("Invalid session");
+  }
+
+  // Internal users don't have customer records
+  if (
+    session.user.role === "admin" ||
+    session.user.role === "support" ||
+    session.user.role === "developer"
+  ) {
+    return null;
+  }
+
+  return getCustomerByUserId(session.user.id);
+}
+
+/**
+ * Require customer from session or throw error
+ * Use this in customer-only endpoints
+ *
+ * @param session - User session
+ * @returns Customer object
+ * @throws CustomerNotFoundError if customer doesn't exist
+ */
+export async function requireCustomerFromSession(
+  session: Session
+): Promise<Customer> {
+  const customer = await getCustomerFromSession(session);
+
+  if (!customer) {
+    throw new CustomerNotFoundError(
+      "Customer record not found. This endpoint is only available to customer users."
+    );
+  }
+
+  return customer;
 }

@@ -116,7 +116,7 @@ To test the setup:
 
 1. Ensure all 3 products exist in Stripe with correct metadata
 2. Ensure each product has both monthly and annual prices
-3. Call `/api/plans` endpoint - it should return all plans with prices from Stripe
+3. Call `/api/subscriptions/plans` endpoint - it should return all plans with prices from Stripe
 4. Check the browser console for any warnings about missing plans
 
 ## Troubleshooting

@@ -35,7 +35,7 @@ export default function BillingHistoryPage() {
   const fetchBillingHistory = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/billing-history");
+      const response = await fetch("/api/subscriptions/billing-history");
       const data = await response.json();
 
       if (!response.ok) {

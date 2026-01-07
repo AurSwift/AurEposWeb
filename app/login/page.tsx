@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -46,9 +44,23 @@ export default function LoginPage() {
       // Wait a moment for the session cookie to be set
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Use window.location for a full page reload to ensure session is available
-      window.location.href = "/dashboard";
-    } catch (err) {
+      // Fetch session to check user role and redirect accordingly
+      const response = await fetch("/api/auth/session");
+      const session = await response.json();
+
+      // Redirect based on role
+      if (
+        session?.user?.role === "admin" ||
+        session?.user?.role === "support" ||
+        session?.user?.role === "developer"
+      ) {
+        // Internal users go to admin dashboard
+        window.location.href = "/admin";
+      } else {
+        // Customers go to customer dashboard
+        window.location.href = "/dashboard";
+      }
+    } catch {
       setError("Something went wrong. Please try again.");
       setIsLoading(false);
     }
@@ -145,7 +157,7 @@ export default function LoginPage() {
           </form>
 
           <div className="text-center text-sm text-muted-foreground pt-2">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link
               href="/signup"
               className="text-primary hover:underline font-medium"

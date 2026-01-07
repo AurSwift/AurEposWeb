@@ -3,50 +3,23 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import type { Session } from "next-auth";
 
-/**
- * Custom error for unauthorized access
- * Provides consistent error handling for authentication failures
- */
-export class UnauthorizedError extends Error {
-  public readonly statusCode = 401;
+// Re-export role-based auth helpers
+export {
+  requireAuth,
+  requireRole,
+  requireAnyRole,
+  requireMinRole,
+  requireAdmin,
+  requireInternalUser,
+  requireCustomer,
+  UnauthorizedError,
+  ForbiddenError,
+  createUnauthorizedResponse,
+  createForbiddenResponse,
+} from "./role-middleware";
 
-  constructor(message: string = "Unauthorized - Authentication required") {
-    super(message);
-    this.name = "UnauthorizedError";
-  }
-}
-
-/**
- * Require authentication using auth() helper
- * Recommended for App Router API routes
- *
- * @returns Authenticated session
- * @throws {UnauthorizedError} If user is not authenticated
- *
- * @example
- * export async function GET(request: NextRequest) {
- *   try {
- *     const session = await requireAuth();
- *     // Proceed with authenticated user: session.user.id
- *   } catch (error) {
- *     if (error instanceof UnauthorizedError) {
- *       return NextResponse.json({ error: error.message }, { status: 401 });
- *     }
- *     throw error;
- *   }
- * }
- */
-export async function requireAuth(): Promise<Session> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    throw new UnauthorizedError(
-      "Authentication required. Please log in to continue."
-    );
-  }
-
-  return session;
-}
+// Import for local use
+import { UnauthorizedError } from "./role-middleware";
 
 /**
  * Require authentication using getServerSession (alternative method)

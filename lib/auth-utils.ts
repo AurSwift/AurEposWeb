@@ -50,7 +50,8 @@ export async function getUserById(id: string): Promise<User | null> {
 export async function createUser(
   email: string,
   password: string,
-  name: string
+  name: string,
+  role: "customer" | "admin" | "support" | "developer" = "customer"
 ): Promise<User> {
   const hashedPassword = await hashPassword(password);
 
@@ -61,13 +62,17 @@ export async function createUser(
       email,
       password: hashedPassword,
       name,
+      role,
     })
     .returning();
 
+  // Only create customer record for customer users
+  // Admin, support, and developer users don't need customer records
+  if (role === "customer") {
   // Create customer record linked to user
   // Note: No subscription is created here - user must complete Stripe checkout
   // to create subscription with payment method and start trial
-  const [customer] = await db
+    await db
     .insert(customers)
     .values({
       userId: newUser.id, // Link user to customer (one-to-one)
@@ -76,6 +81,7 @@ export async function createUser(
       status: "active",
     })
     .returning();
+  }
 
   return newUser;
 }

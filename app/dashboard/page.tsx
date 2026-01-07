@@ -17,7 +17,12 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Fetch all necessary data in parallel
+  // 🔒 RBAC: Internal users should use /admin dashboard
+  if (session.user.role === "admin" || session.user.role === "support" || session.user.role === "developer") {
+    redirect("/admin");
+  }
+
+  // Fetch all necessary data in parallel (customers only)
   const [customerResult] = await db
     .select()
     .from(customers)
@@ -25,8 +30,17 @@ export default async function DashboardPage() {
     .limit(1);
 
   if (!customerResult) {
-    // If no customer, something is wrong, redirect or show error
-    redirect("/login");
+    // Customer user without customer record - data integrity issue
+    return (
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold text-destructive">Account Setup Required</h2>
+          <p className="text-muted-foreground mt-2">
+            Your account is missing required customer information. Please contact support.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   const customer = customerResult;

@@ -39,7 +39,7 @@ export function PricingPreviewSection() {
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const response = await fetch("/api/plans");
+        const response = await fetch("/api/subscriptions/plans");
         const data = await response.json();
         if (data.plans) {
           // Convert plans object to array and sort by plan order

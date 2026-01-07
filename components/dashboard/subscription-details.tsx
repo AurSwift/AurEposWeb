@@ -69,7 +69,7 @@ export function SubscriptionDetails({
 
   const handleManageBilling = async () => {
     try {
-      const response = await fetch("/api/stripe/portal", { method: "POST" });
+      const response = await fetch("/api/stripe/billing/portal", { method: "POST" });
       const data = await response.json();
 
       if (!response.ok) {

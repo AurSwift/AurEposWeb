@@ -103,7 +103,15 @@ export function Header() {
                   asChild 
                   className="hidden sm:inline-flex border border-border bg-background shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <Link href="/dashboard">Go to Dashboard</Link>
+                  <Link href={
+                    session?.user?.role === "admin" || 
+                    session?.user?.role === "support" || 
+                    session?.user?.role === "developer" 
+                      ? "/admin" 
+                      : "/dashboard"
+                  }>
+                    Go to Dashboard
+                  </Link>
                 </Button>
                 <Button variant="outline" onClick={handleLogout}>
                   Logout

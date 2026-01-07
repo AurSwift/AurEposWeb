@@ -55,7 +55,7 @@ function SignupPageContent() {
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const response = await fetch("/api/plans");
+        const response = await fetch("/api/subscriptions/plans");
         const data = await response.json();
         if (data.plans) {
           setPlans(data.plans);
@@ -146,7 +146,7 @@ function SignupPageContent() {
     setError("");
 
     try {
-      const response = await fetch("/api/stripe/create-checkout", {
+      const response = await fetch("/api/stripe/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -64,7 +64,7 @@ function PricingPageContent() {
     async function fetchPlans(retries = 3, delay = 1000) {
       for (let attempt = 0; attempt < retries; attempt++) {
         try {
-          const response = await fetch("/api/plans");
+          const response = await fetch("/api/subscriptions/plans");
           
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -160,7 +160,7 @@ function PricingPageContent() {
     setError("");
 
     try {
-      const response = await fetch("/api/stripe/create-checkout", {
+      const response = await fetch("/api/stripe/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

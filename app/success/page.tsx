@@ -41,7 +41,7 @@ function SuccessPageContent() {
 
       try {
         // Call sync endpoint
-        const response = await fetch("/api/stripe/sync-subscription", {
+        const response = await fetch("/api/stripe/subscriptions/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),

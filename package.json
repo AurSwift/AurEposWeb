@@ -13,16 +13,16 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:apply-roles": "tsx scripts/apply-role-migration.ts",
-    "db:apply-employees": "tsx scripts/apply-employees-migration.ts",
-    "db:apply-permissions": "tsx scripts/apply-permissions-migration.ts",
-    "db:seed-permissions": "tsx scripts/seed-permissions.ts",
+    "db:apply-roles": "tsx -r dotenv/config scripts/apply-role-migration.ts dotenv_config_path=.env.local",
+    "db:apply-employees": "tsx -r dotenv/config scripts/apply-employees-migration.ts dotenv_config_path=.env.local",
+    "db:apply-permissions": "tsx -r dotenv/config scripts/apply-permissions-migration.ts dotenv_config_path=.env.local",
+    "db:seed-permissions": "tsx -r dotenv/config scripts/seed-permissions.ts dotenv_config_path=.env.local",
     "db:cleanup": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local",
     "db:cleanup:dry-run": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local --dry-run",
     "db:count": "tsx -r dotenv/config scripts/db/count-db-records.ts dotenv_config_path=.env.local",
     "db:drop-tables": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local",
     "db:drop-tables:dry-run": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local --dry-run",
-    "admin:create": "tsx scripts/create-admin-user.ts"
+    "admin:create": "tsx --env-file=.env.local scripts/create-admin-user.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
