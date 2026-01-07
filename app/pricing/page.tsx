@@ -87,12 +87,14 @@ function PricingPageContent() {
           
           setPlans(data.plans);
           setError("");
+          setPlansLoading(false); // Mark loading as complete on success
           return;
         } catch (err) {
           console.error(`Attempt ${attempt + 1} failed:`, err);
           
           if (attempt === retries - 1) {
             setError("Failed to load plans. Please refresh the page.");
+            setPlansLoading(false); // Mark loading as complete on final failure
           } else {
             // Exponential backoff
             await new Promise((resolve) =>
@@ -101,7 +103,6 @@ function PricingPageContent() {
           }
         }
       }
-      setPlansLoading(false);
     }
     
     fetchPlans();

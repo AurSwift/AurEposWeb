@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/client";
 import { db } from "@/lib/db";
-import { subscriptions, licenseKeys } from "@/lib/db/schema";
+import { subscriptions, licenseKeys, customers } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getPlan } from "@/lib/stripe/plans";
 import { generateLicenseKey } from "@/lib/license/generator";
@@ -27,7 +27,26 @@ export async function POST(request: NextRequest) {
       throw new ValidationError("Session ID required");
     }
 
-    const customer = await getCustomerOrThrow(session.user.id);
+    // Allow deleted customers to sync (they just completed checkout)
+    const customer = await getCustomerOrThrow(session.user.id, true);
+
+    // 🔄 RESTORE DELETED CUSTOMER: If customer was previously deleted,
+    // restore them when syncing a new subscription (they just paid!)
+    if (customer.status === "deleted") {
+      console.log(
+        `[Sync] Restoring deleted customer ${customer.id} after successful checkout`
+      );
+      
+      await db
+        .update(customers)
+        .set({
+          status: "active",
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, customer.id));
+      
+      console.log(`[Sync] ✅ Customer ${customer.id} restored to active status`);
+    }
 
     // Retrieve checkout session from Stripe
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {

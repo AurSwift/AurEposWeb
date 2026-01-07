@@ -119,23 +119,47 @@ export async function handleCheckoutCompleted(session: CheckoutSessionData) {
     throw new Error("Customer not found");
   }
 
+  // 🔄 RESTORE DELETED CUSTOMER: If customer was previously deleted,
+  // restore them when they successfully complete a new checkout
+  if (customer.status === "deleted") {
+    console.log(
+      `[Webhook] Restoring deleted customer ${customer.id} after successful checkout`
+    );
+    
+    await db
+      .update(customers)
+      .set({
+        status: "active",
+        stripeCustomerId: stripeSubscription.customer as string,
+        updatedAt: new Date(),
+      })
+      .where(eq(customers.id, customer.id));
+    
+    console.log(`[Webhook] ✅ Customer ${customer.id} restored to active status`);
+  }
+
   const plan = await getPlan(planId);
   const price =
     billingCycle === "monthly" ? plan.priceMonthly : plan.priceAnnual;
 
-  // Calculate billing period dates
-  const currentPeriodStart = new Date(
-    stripeSubscription.current_period_start * 1000
-  );
-  const currentPeriodEnd = new Date(
-    stripeSubscription.current_period_end * 1000
-  );
-  const trialEnd = stripeSubscription.trial_end
-    ? new Date(stripeSubscription.trial_end * 1000)
-    : null;
-  const trialStart = stripeSubscription.trial_start
-    ? new Date(stripeSubscription.trial_start * 1000)
-    : null;
+  // Calculate billing period dates - handle undefined/null timestamps
+  const currentPeriodStart = stripeSubscription.current_period_start
+    ? new Date(stripeSubscription.current_period_start * 1000)
+    : new Date();
+    
+  const currentPeriodEnd = stripeSubscription.current_period_end
+    ? new Date(stripeSubscription.current_period_end * 1000)
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default to 30 days from now
+    
+  const trialEnd =
+    stripeSubscription.trial_end && stripeSubscription.trial_end > 0
+      ? new Date(stripeSubscription.trial_end * 1000)
+      : null;
+      
+  const trialStart =
+    stripeSubscription.trial_start && stripeSubscription.trial_start > 0
+      ? new Date(stripeSubscription.trial_start * 1000)
+      : null;
 
   // Plan code mapping for license key prefix
   const PLAN_CODES: Record<string, string> = {

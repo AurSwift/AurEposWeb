@@ -11,7 +11,7 @@ export function shouldRetryError(error: unknown): boolean {
   // Network/connection errors - should retry
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
-    
+
     // Database connection errors
     if (
       message.includes("connection") ||
@@ -55,6 +55,7 @@ export async function logWebhookError(
 ): Promise<void> {
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorStack = error instanceof Error ? error.stack : undefined;
+  const timestamp = new Date().toISOString();
 
   try {
     await db
@@ -62,10 +63,10 @@ export async function logWebhookError(
       .set({
         processed: false,
         metadata: sql`${webhookEvents.metadata} || jsonb_build_object(
-          'error', ${errorMessage},
-          'errorStack', ${errorStack || null},
-          'retryable', ${retryable},
-          'failedAt', ${new Date().toISOString()}
+          'error', CAST(${errorMessage} AS text),
+          'errorStack', CAST(${errorStack || null} AS text),
+          'retryable', CAST(${retryable} AS boolean),
+          'failedAt', CAST(${timestamp} AS text)
         )`,
       })
       .where(eq(webhookEvents.stripeEventId, eventId));
@@ -80,13 +81,15 @@ export async function logWebhookError(
  * @param eventId - Stripe event ID
  */
 export async function markWebhookSuccess(eventId: string): Promise<void> {
+  const timestamp = new Date().toISOString();
+
   try {
     await db
       .update(webhookEvents)
       .set({
         processed: true,
         metadata: sql`${webhookEvents.metadata} || jsonb_build_object(
-          'processedAt', ${new Date().toISOString()}
+          'processedAt', CAST(${timestamp} AS text)
         )`,
       })
       .where(eq(webhookEvents.stripeEventId, eventId));
@@ -116,7 +119,7 @@ export async function withTransaction<T>(
  */
 export function getWebhookErrorStatus(error: unknown): number {
   const retryable = shouldRetryError(error);
-  
+
   // Return 500 for retryable errors (Stripe will retry)
   // Return 200 for non-retryable errors (no point retrying)
   return retryable ? 500 : 200;

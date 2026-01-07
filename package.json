@@ -22,7 +22,8 @@
     "db:count": "tsx -r dotenv/config scripts/db/count-db-records.ts dotenv_config_path=.env.local",
     "db:drop-tables": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local",
     "db:drop-tables:dry-run": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local --dry-run",
-    "admin:create": "tsx --env-file=.env.local scripts/create-admin-user.ts"
+    "admin:create": "tsx --env-file=.env.local scripts/create-admin-user.ts",
+    "webhook:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhooks/handler"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
