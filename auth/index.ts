@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 
 export const authOptions: NextAuthOptions = {
   // No adapter needed for JWT sessions - sessions are stored in cookies
+  basePath: "/api/auth",
   providers: [
     CredentialsProvider({
       name: "Credentials",
