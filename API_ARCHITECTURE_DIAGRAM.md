@@ -1,11 +1,20 @@
-# API Architecture Diagram - Dual Hybrid Approach
+# API Architecture Documentation
 
-**Last Updated:** January 6, 2025 (Post-Migration)  
-**Status:** ✅ Reflects current project structure after migration
+**Last Updated:** January 9, 2025  
+**Status:** Current architecture documentation
 
 ---
 
-## Visual Overview
+## System Overview
+
+The AuraSwift API implements a dual hybrid architecture combining:
+- **Direct API routes** for user-initiated, synchronous operations
+- **Webhook routes** for Stripe-initiated, asynchronous event processing
+- **Real-time event streaming** via Server-Sent Events (SSE) for desktop app synchronization
+
+---
+
+## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -40,14 +49,16 @@
 │  │   ├── cancel/                  │   │   ├── checkout.completed        │  │
 │  │   ├── reactivate/              │   │   ├── subscription.updated      │  │
 │  │   ├── change-plan/             │   │   ├── subscription.deleted      │  │
-│  │   ├── current/                 │   │   ├── invoice.payment_succeeded │  │
-│  │   ├── history/                 │   │   └── invoice.payment_failed    │  │
-│  │   ├── billing-history/         │   │                                 │  │
-│  │   └── plans/                   │   │                                 │  │
+│  │   ├── preview-change/          │   │   ├── invoice.payment_succeeded │  │
+│  │   ├── current/                 │   │   ├── invoice.payment_failed    │  │
+│  │   ├── history/                 │   │   ├── customer.updated          │  │
+│  │   ├── billing-history/         │   │   ├── payment_method.*          │  │
+│  │   └── plans/                   │   │   └── invoice.*                 │  │
 │  │                                │   │                                 │  │
-│  │  /stripe/                      │   │                                 │  │
-│  │   ├── checkout/create/         │   │  Pattern: Event-driven          │  │
-│  │   ├── subscriptions/sync/      │   │  Async: 1-5 second delay        │  │
+│  │  /stripe/                      │   │  /stripe/webhooks/replay/      │  │
+│  │   ├── checkout/create/         │   │                                 │  │
+│  │   ├── subscriptions/           │   │  Pattern: Event-driven          │  │
+│  │   ├── sync/                    │   │  Async: 1-5 second delay        │  │
 │  │   ├── billing/portal/          │   │  Purpose: Background sync       │  │
 │  │   └── billing/payment-method/  │   │                                 │  │
 │  │                                │   └─────────────────────────────────┘  │
@@ -67,12 +78,56 @@
 │  │   └── heartbeat/        Keep-alive signal                            │   │
 │  │                                                                       │   │
 │  │  /events/               Real-time sync                               │   │
-│  │   └── [licenseKey]/     SSE endpoint                                 │   │
+│  │   ├── [licenseKey]/     SSE endpoint                                 │   │
+│  │   ├── [licenseKey]/missed/  Fetch missed events                      │   │
+│  │   └── acknowledge/      Event acknowledgment                         │   │
+│  │                                                                       │   │
+│  │  /admin/                Administrative operations                    │   │
+│  │   ├── customers/        Customer management                          │   │
+│  │   ├── licenses/         License management                           │   │
+│  │   ├── stats/            System statistics                            │   │
+│  │   └── support/          Support ticket management                    │   │
+│  │                                                                       │   │
+│  │  /analytics/            Analytics and reporting                      │   │
+│  │   ├── health/           Health analytics                             │   │
+│  │   ├── patterns/         Usage patterns                               │   │
+│  │   └── trends/           Usage trends                                 │   │
+│  │                                                                       │   │
+│  │  /dlq/                  Dead Letter Queue                            │   │
+│  │   ├── route.ts          List & stats                                 │   │
+│  │   ├── retry/[eventId]/  Retry failed event                           │   │
+│  │   └── resolve/[eventId]/ Resolve failed event                        │   │
+│  │                                                                       │   │
+│  │  /monitoring/           System monitoring                            │   │
+│  │   ├── event-durability/ Event durability metrics                     │   │
+│  │   └── health/           System health                                │   │
+│  │                                                                       │   │
+│  │  /cron/                 Scheduled background jobs                     │   │
+│  │   ├── analytics/        Analytics processing                         │   │
+│  │   ├── cleanup-events/   Event cleanup                                │   │
+│  │   ├── detect-stale-sessions/  Stale session detection                │   │
+│  │   ├── expiration-check/ Subscription expiration                      │   │
+│  │   ├── health-monitoring/ Health monitoring                           │   │
+│  │   └── retry-events/     Event retry processing                       │   │
 │  │                                                                       │   │
 │  │  /payments/             Payment tracking                             │   │
 │  │   └── history/          Payment records                              │   │
 │  │                                                                       │   │
+│  │  /invoices/             Invoice management                           │   │
+│  │   └── history/          Invoice records                              │   │
+│  │                                                                       │   │
 │  │  /terminals/            Terminal management                          │   │
+│  │   ├── route.ts          Get terminals                                │   │
+│  │   ├── broadcast/        Broadcast to terminals                       │   │
+│  │   └── sync/             Sync terminal data                           │   │
+│  │                                                                       │   │
+│  │  /terminal-sessions/    Terminal session management                  │   │
+│  │                                                                       │   │
+│  │  /health/               Health check endpoints                       │   │
+│  │   └── sse/              SSE health check                             │   │
+│  │                                                                       │   │
+│  │  /releases/             Release management                           │   │
+│  │   └── latest/           Latest release info                          │   │
 │  │                                                                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
@@ -85,12 +140,31 @@
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  PostgreSQL (Neon Cloud)                                                     │
-│  ├── subscriptions         Subscription records                              │
-│  ├── customers             Customer records                                  │
-│  ├── licenseKeys           License keys                                      │
-│  ├── payments              Payment records                                   │
-│  ├── subscriptionChanges   Audit trail                                       │
-│  └── webhookEvents         Webhook deduplication                             │
+│  ├── subscriptions         Subscription records                             │
+│  ├── customers             Customer records                                 │
+│  ├── licenseKeys           License keys                                     │
+│  ├── activations           License activations per machine                  │
+│  ├── payments              Payment records                                  │
+│  ├── invoices              Invoice records                                  │
+│  ├── subscriptionChanges   Audit trail                                      │
+│  ├── webhookEvents         Webhook deduplication                            │
+│  ├── subscriptionEvents    Events published to SSE                          │
+│  ├── eventAcknowledgments  Desktop app acknowledgments                      │
+│  └── deadLetterQueue       Failed events for retry                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       REDIS (Event Distribution)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Redis Pub/Sub                                                               │
+│  ├── Channels: license:{licenseKey}                                         │
+│  ├── Publishers: Webhook handlers, Direct API routes                        │
+│  ├── Subscribers: SSE endpoint connections                                  │
+│  └── Purpose: Distribute events across server instances                     │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -99,12 +173,21 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          DESKTOP APPS                                        │
 │                      (Electron - SSE Clients)                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Desktop Application                                                         │
+│  ├── SSE Connection: GET /api/events/[licenseKey]                           │
+│  ├── Event Processing: Receives real-time subscription updates              │
+│  ├── Acknowledgment: POST /api/events/acknowledge                           │
+│  ├── Missed Events: GET /api/events/[licenseKey]/missed                    │
+│  └── License Operations: /api/license/*                                     │
+│                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Flow Diagrams
+## Request Flow Patterns
 
 ### Flow 1: User Cancels Subscription (Direct API)
 
@@ -122,12 +205,14 @@
 │  (Direct API Route)                     │
 │                                          │
 │  ┌────────────────────────────────────┐ │
-│  │ 1. Validate request                │ │
-│  │ 2. stripe.subscriptions.cancel()   │ │◄─── Stripe API
-│  │ 3. db.update(subscriptions)        │ │◄─── PostgreSQL
-│  │ 4. db.update(licenseKeys)          │ │
-│  │ 5. publishSSEEvent()               │ │──► SSE Publisher
-│  │ 6. Return success                  │ │
+│  │ 1. requireAuth()                   │ │◄─── NextAuth.js
+│  │ 2. getCustomerOrThrow()            │ │◄─── Database
+│  │ 3. stripe.subscriptions.cancel()   │ │◄─── Stripe API
+│  │ 4. db.update(subscriptions)        │ │◄─── PostgreSQL
+│  │ 5. db.update(licenseKeys)          │ │
+│  │ 6. createSubscriptionEvent()       │ │
+│  │ 7. publishToRedis(licenseKey)      │ │──► Redis Pub/Sub
+│  │ 8. Return success                  │ │
 │  └────────────────────────────────────┘ │
 └─────────────────────────────────────────┘
        │
@@ -138,14 +223,23 @@
 │    User     │
 │ Sees Success│
 └─────────────┘
+       │
+       │ 3. Event published to Redis
+       │
+       ▼
+┌─────────────┐
+│  Desktop    │
+│    Apps     │
+│ (via SSE)   │
+└─────────────┘
 ```
 
-**Key Points:**
-
-- ✅ Immediate user feedback
-- ✅ Synchronous flow
-- ✅ Error handling visible to user
-- ✅ ~250ms response time
+**Characteristics:**
+- Synchronous flow
+- Immediate user feedback (~250ms)
+- Database updated immediately
+- Event published to Redis for desktop apps
+- Error handling visible to user
 
 ---
 
@@ -167,13 +261,16 @@
 │                                          │
 │  ┌────────────────────────────────────┐ │
 │  │ 1. Verify signature                │ │
-│  │ 2. Check idempotency               │ │
+│  │ 2. Check idempotency (webhookEvents)│ │◄─── PostgreSQL
 │  │ 3. Parse event type                │ │
 │  │ 4. invoice.payment_succeeded       │ │
-│  │ 5. db.update(subscriptions)        │ │◄─── PostgreSQL
-│  │ 6. db.insert(payments)             │ │
-│  │ 7. publishSSEEvent()               │ │──► SSE Publisher
-│  │ 8. Return 200 OK                   │ │
+│  │ 5. handlePaymentSucceeded()        │ │
+│  │ 6. db.update(subscriptions)        │ │◄─── PostgreSQL
+│  │ 7. db.insert(payments)             │ │
+│  │ 8. createSubscriptionEvent()       │ │
+│  │ 9. publishToRedis(licenseKey)      │ │──► Redis Pub/Sub
+│  │ 10. markWebhookSuccess()           │ │
+│  │ 11. Return 200 OK                  │ │
 │  └────────────────────────────────────┘ │
 └─────────────────────────────────────────┘
        │
@@ -185,21 +282,107 @@
 │   Cloud     │
 └─────────────┘
        │
-       │ 4. SSE notification
+       │ 4. Event published to Redis
        │
        ▼
 ┌─────────────┐
 │  Desktop    │
 │    Apps     │
+│ (via SSE)   │
 └─────────────┘
+       │
+       │ 5. Desktop processes event
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  POST /api/events/acknowledge           │
+│  (Event Acknowledgment)                 │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │ 1. Record acknowledgment           │ │◄─── PostgreSQL
+│  │ 2. Update event status             │ │
+│  │ 3. Return success                  │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
 ```
 
-**Key Points:**
+**Characteristics:**
+- Asynchronous flow
+- Background processing (1-5 second delay acceptable)
+- Idempotency via `webhookEvents` table
+- Event distribution via Redis
+- Desktop acknowledgment tracking
 
-- ✅ No user waiting
-- ✅ Asynchronous flow
-- ✅ Automatic processing
-- ✅ 1-5 second delay acceptable
+---
+
+### Flow 3: Real-Time Event Streaming (SSE)
+
+```
+┌─────────────┐
+│  Desktop    │
+│    App      │
+└──────┬──────┘
+       │
+       │ 1. Connect to SSE endpoint
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  GET /api/events/[licenseKey]           │
+│  (SSE Endpoint)                         │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │ 1. Validate license key            │ │◄─── PostgreSQL
+│  │ 2. Create SSE connection           │ │
+│  │ 3. Subscribe to Redis channel      │ │◄─── Redis
+│  │    "license:{licenseKey}"          │ │
+│  │ 4. Send initial connection event   │ │
+│  │ 5. Start heartbeat (30s interval)  │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+       │
+       │ 2. Connection established
+       │
+       │ (Connection remains open)
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  Event Published (from any route)       │
+│                                          │
+│  createSubscriptionEvent()               │
+│    └─> publishToRedis(licenseKey, event)│
+└─────────────────────────────────────────┘
+       │
+       │ 3. Redis broadcasts to subscribers
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  SSE Endpoint Receives Redis Event      │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │ 1. Receive event from Redis        │ │
+│  │ 2. Format as SSE message           │ │
+│  │ 3. Send to connected client        │ │
+│  │ 4. Client processes event          │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+       │
+       │ 4. Desktop processes event
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  POST /api/events/acknowledge           │
+│                                          │
+│  { eventId, licenseKey, status }        │
+└─────────────────────────────────────────┘
+```
+
+**Characteristics:**
+- Persistent connection
+- Real-time event delivery (< 100ms)
+- Redis pub/sub for multi-instance support
+- Heartbeat mechanism (30s interval)
+- Connection timeout (5 minutes of inactivity)
+- Acknowledgment tracking
 
 ---
 
@@ -214,25 +397,33 @@
 ├────────────────────────────────────────────────────────────────────┤
 │                                                                    │
 │  Category: Subscriptions                                           │
-│  ├── POST /subscriptions/cancel          ⚡ Fast: 250ms           │
-│  ├── POST /subscriptions/reactivate      ⚡ Fast: 250ms           │
-│  ├── POST /subscriptions/change-plan     ⚡ Fast: 250ms           │
-│  ├── GET  /subscriptions/current         ⚡ Fast: 100ms           │
-│  ├── GET  /subscriptions/history         ⚡ Fast: 150ms           │
-│  ├── GET  /subscriptions/billing-history ⚡ Fast: 150ms           │
-│  └── GET  /subscriptions/plans           ⚡ Fast: 100ms           │
+│  ├── POST /subscriptions/cancel          ⚡ ~250ms                │
+│  ├── POST /subscriptions/reactivate      ⚡ ~250ms                │
+│  ├── POST /subscriptions/change-plan     ⚡ ~250ms                │
+│  ├── POST /subscriptions/preview-change  ⚡ ~400ms                │
+│  ├── GET  /subscriptions/current         ⚡ ~100ms                │
+│  ├── GET  /subscriptions/history         ⚡ ~150ms                │
+│  ├── GET  /subscriptions/billing-history ⚡ ~150ms                │
+│  └── GET  /subscriptions/plans           ⚡ ~100ms                │
 │                                                                    │
 │  Category: Stripe                                                  │
-│  ├── POST /stripe/checkout/create        ⚡ Fast: 300ms           │
-│  ├── POST /stripe/subscriptions/sync     ⚡ Fast: 400ms           │
-│  ├── POST /stripe/billing/portal         ⚡ Fast: 200ms           │
-│  └── GET  /stripe/billing/payment-method  ⚡ Fast: 250ms           │
+│  ├── POST /stripe/checkout/create        ⚡ ~300ms                │
+│  ├── POST /stripe/subscriptions          ⚡ ~400ms                │
+│  ├── POST /stripe/sync                   ⚡ ~500ms                │
+│  ├── POST /stripe/billing/portal         ⚡ ~200ms                │
+│  └── GET  /stripe/billing/payment-method ⚡ ~250ms                │
 │                                                                    │
 │  Category: License                                                 │
-│  ├── POST /license/activate              ⚡ Fast: 300ms           │
-│  ├── POST /license/deactivate            ⚡ Fast: 250ms           │
-│  ├── POST /license/validate              ⚡ Fast: 200ms           │
-│  └── POST /license/heartbeat             ⚡ Fast: 150ms           │
+│  ├── POST /license/activate              ⚡ ~300ms                │
+│  ├── POST /license/deactivate            ⚡ ~250ms                │
+│  ├── POST /license/validate              ⚡ ~200ms                │
+│  └── POST /license/heartbeat             ⚡ ~150ms                │
+│                                                                    │
+│  Category: Admin                                                   │
+│  ├── GET  /admin/customers               ⚡ ~200ms                │
+│  ├── GET  /admin/stats                   ⚡ ~300ms                │
+│  ├── POST /admin/licenses/[id]/revoke    ⚡ ~250ms                │
+│  └── POST /admin/support/[id]/respond    ⚡ ~200ms                │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
 
@@ -243,12 +434,22 @@
 │                                                                    │
 │  Route: /stripe/webhooks/handler                                   │
 │                                                                    │
-│  Events:                                                           │
-│  ├── checkout.session.completed          🕒 Delay: 1-5s          │
-│  ├── customer.subscription.updated       🕒 Delay: 1-5s          │
-│  ├── customer.subscription.deleted       🕒 Delay: 1-5s          │
-│  ├── invoice.payment_succeeded           🕒 Delay: 1-5s          │
-│  └── invoice.payment_failed              🕒 Delay: 1-5s          │
+│  Events Handled:                                                   │
+│  ├── checkout.session.completed          🕒 1-5s                 │
+│  ├── customer.subscription.updated       🕒 1-5s                 │
+│  ├── customer.subscription.deleted       🕒 1-5s                 │
+│  ├── invoice.payment_succeeded           🕒 1-5s                 │
+│  ├── invoice.payment_failed              🕒 1-5s                 │
+│  ├── customer.updated                    🕒 1-5s                 │
+│  ├── customer.deleted                    🕒 1-5s                 │
+│  ├── payment_method.attached             🕒 1-5s                 │
+│  ├── payment_method.detached             🕒 1-5s                 │
+│  ├── invoice.created                     🕒 1-5s                 │
+│  ├── invoice.updated                     🕒 1-5s                 │
+│  └── invoice.paid                        🕒 1-5s                 │
+│                                                                    │
+│  Route: /stripe/webhooks/replay                                    │
+│  └── POST (replay webhook events)        🕒 Variable             │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
 
@@ -258,53 +459,35 @@
 ├────────────────────────────────────────────────────────────────────┤
 │                                                                    │
 │  Route: /events/[licenseKey]                                       │
+│  ├── GET                              📡 Real-time (< 100ms)      │
+│  └── GET  /events/[licenseKey]/missed 📡 ~150ms                   │
 │                                                                    │
-│  Pattern: Server-Sent Events (SSE)                                 │
-│  Purpose: Push notifications to desktop apps                       │
-│  Latency: Real-time (< 100ms)                                      │
+│  Route: /events/acknowledge                                        │
+│  ├── POST (acknowledge event)          ⚡ ~200ms                  │
+│  └── GET  (get acknowledgment status)  ⚡ ~150ms                  │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│                   BACKGROUND JOB ROUTES                            │
+│                    (Cron - Scheduled Tasks)                        │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Route: /cron/*                                                    │
+│  ├── GET  /cron/analytics              ⏰ Scheduled               │
+│  ├── GET  /cron/cleanup-events         ⏰ Scheduled               │
+│  ├── GET  /cron/detect-stale-sessions  ⏰ Scheduled               │
+│  ├── GET  /cron/expiration-check       ⏰ Scheduled               │
+│  ├── POST /cron/expiration-check       ⏰ Manual trigger          │
+│  ├── GET  /cron/health-monitoring      ⏰ Scheduled               │
+│  └── GET  /cron/retry-events           ⏰ Scheduled               │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Data Flow Patterns
-
-### Pattern 1: Optimistic Update (Direct API)
-
-```
-User Action → Stripe API → Database Update → User Feedback
-   (0ms)        (200ms)         (50ms)          (250ms)
-              └─────────────────────────────────┘
-                   Synchronous Transaction
-```
-
-**Benefits:**
-
-- ✅ Immediate feedback
-- ✅ Error handling
-- ✅ Atomic transactions
-
----
-
-### Pattern 2: Event-Driven Update (Webhook)
-
-```
-Stripe Event → Webhook → Database Update → SSE Notification → Desktop
-   (0s)         (1-2s)       (0.1s)           (0.1s)          (1-3s)
-              └────────────────────────────────────────────────┘
-                     Asynchronous Processing
-```
-
-**Benefits:**
-
-- ✅ No user blocking
-- ✅ Reliable delivery
-- ✅ Retry mechanism
-
----
-
-## Security Layers
+## Security Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -314,13 +497,17 @@ Stripe Event → Webhook → Database Update → SSE Notification → Desktop
 │  NextAuth.js Session                                         │
 │  ├── JWT tokens                                              │
 │  ├── Session validation                                      │
-│  └── Role-based access                                       │
+│  └── Role-based access control                               │
 │                                                              │
 │  Applied to:                                                 │
 │  ├── All /subscriptions/* routes                            │
-│  ├── All /license/* routes                                  │
+│  ├── All /stripe/* routes (except webhooks)                 │
+│  ├── All /admin/* routes                                    │
+│  ├── All /analytics/* routes                                │
 │  ├── All /payments/* routes                                 │
-│  └── All /stripe/* routes (except webhooks)                 │
+│  ├── All /invoices/* routes                                 │
+│  ├── All /profile/* routes                                  │
+│  └── All /user/* routes                                     │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
                           ▼
@@ -329,14 +516,15 @@ Stripe Event → Webhook → Database Update → SSE Notification → Desktop
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Customer Ownership Validation                               │
-│  ├── Verify subscription belongs to user                     │
-│  ├── Verify license belongs to customer                      │
-│  └── Verify payment belongs to customer                      │
+│  ├── requireAuth() - Session validation helper              │
+│  ├── getCustomerOrThrow() - Customer lookup helper          │
+│  ├── Verify subscription belongs to user                    │
+│  ├── Verify license belongs to customer                     │
+│  └── Verify payment/invoice belongs to customer             │
 │                                                              │
-│  Applied via:                                                │
-│  ├── requireAuth() helper                                    │
-│  ├── getCustomerOrThrow() helper                            │
-│  └── Database foreign key constraints                        │
+│  Admin Role Validation                                       │
+│  ├── Admin-only routes require admin role                   │
+│  └── Applied to: /admin/*, /monitoring/*                    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
                           ▼
@@ -345,14 +533,32 @@ Stripe Event → Webhook → Database Update → SSE Notification → Desktop
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Stripe Signature Verification                               │
-│  ├── STRIPE_WEBHOOK_SECRET                                   │
+│  ├── STRIPE_WEBHOOK_SECRET (env var)                        │
 │  ├── stripe.webhooks.constructEvent()                       │
-│  └── Signature validation                                    │
+│  └── Signature validation from request headers              │
 │                                                              │
 │  Idempotency Check                                           │
-│  ├── webhookEvents table                                     │
-│  ├── ON CONFLICT DO NOTHING                                  │
-│  └── Event deduplication                                     │
+│  ├── webhookEvents table                                    │
+│  ├── Event ID from Stripe                                   │
+│  ├── ON CONFLICT DO NOTHING                                 │
+│  └── Event deduplication                                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    LICENSE VALIDATION                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  License Key + Machine Fingerprint                           │
+│  ├── License key validation                                 │
+│  ├── Machine ID hash validation                             │
+│  ├── Activation status check                                │
+│  └── Expiration date check                                  │
+│                                                              │
+│  Applied to:                                                 │
+│  ├── /license/* routes                                      │
+│  ├── /events/[licenseKey] SSE endpoint                      │
+│  └── /events/acknowledge (with licenseKey)                  │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -361,77 +567,179 @@ Stripe Event → Webhook → Database Update → SSE Notification → Desktop
 
 ## Error Handling Strategy
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    DIRECT API ROUTES                         │
-│                  (User-Initiated Actions)                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Error Flow:                                                 │
-│  1. Catch error in route handler                             │
-│  2. Log error details                                        │
-│  3. Return user-friendly error message                       │
-│  4. HTTP status code (400, 404, 500)                        │
-│  5. User sees error immediately                              │
-│                                                              │
-│  Example:                                                    │
-│  try {                                                       │
-│    await stripe.subscriptions.cancel(id);                   │
-│    await db.update(subscriptions).set({...});               │
-│    return successResponse({...});                            │
-│  } catch (error) {                                           │
-│    return handleApiError(error, "Failed to cancel");        │
-│  }                                                           │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+### Direct API Routes (User-Initiated)
 
-┌─────────────────────────────────────────────────────────────┐
-│                    WEBHOOK ROUTE                             │
-│                  (Stripe-Initiated Events)                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Error Flow:                                                 │
-│  1. Catch error in webhook handler                           │
-│  2. Log error details                                        │
-│  3. Mark event as failed in database                         │
-│  4. Return 500 status to Stripe                              │
-│  5. Stripe retries automatically                             │
-│                                                              │
-│  Example:                                                    │
-│  try {                                                       │
-│    await handleSubscriptionUpdated(subscription);            │
-│    return NextResponse.json({ received: true });            │
-│  } catch (error) {                                           │
-│    // Mark event as failed                                   │
-│    await db.update(webhookEvents)                            │
-│      .set({ processed: false, error: String(error) });      │
-│    return NextResponse.json(                                 │
-│      { error: "Webhook handler failed" },                    │
-│      { status: 500 }                                         │
-│    );                                                        │
-│  }                                                           │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+**Error Flow:**
+1. Error caught in route handler
+2. Error logged with context
+3. User-friendly error message returned
+4. Appropriate HTTP status code (400, 404, 500)
+5. User sees error immediately
+
+**Example:**
+```typescript
+try {
+  await stripe.subscriptions.cancel(id);
+  await db.update(subscriptions).set({...});
+  return successResponse({...});
+} catch (error) {
+  return handleApiError(error, "Failed to cancel subscription");
+}
 ```
+
+### Webhook Routes (Stripe-Initiated)
+
+**Error Flow:**
+1. Error caught in webhook handler
+2. Error logged with event details
+3. Event marked as failed in `webhookEvents` table
+4. If retriable: Return 500 to trigger Stripe retry
+5. If max retries exceeded: Event enters Dead Letter Queue
+6. Stripe automatically retries (with exponential backoff)
+
+**Example:**
+```typescript
+try {
+  await handleSubscriptionUpdated(subscription);
+  await markWebhookSuccess(event.id);
+  return NextResponse.json({ received: true });
+} catch (error) {
+  const shouldRetry = shouldRetryError(error);
+  await logWebhookError(event.id, error, shouldRetry);
+  
+  if (shouldRetry) {
+    return NextResponse.json(
+      { error: "Webhook processing failed" },
+      { status: 500 }
+    );
+  } else {
+    // Move to DLQ
+    await moveToDeadLetterQueue(event);
+    return NextResponse.json({ received: true });
+  }
+}
+```
+
+### SSE Routes (Real-Time Streaming)
+
+**Error Flow:**
+1. Connection errors handled gracefully
+2. Client automatically reconnects
+3. Missed events fetched on reconnection
+4. Heartbeat failures trigger reconnection
+5. Connection timeout closes gracefully
+
+---
+
+## Event Durability & Reliability
+
+### Event Acknowledgment System
+
+**Purpose:** Track which events were successfully processed by desktop apps
+
+**Flow:**
+1. Event published to Redis → SSE endpoint
+2. Desktop app receives event via SSE
+3. Desktop app processes event
+4. Desktop app sends acknowledgment: `POST /api/events/acknowledge`
+5. Acknowledgment recorded in `eventAcknowledgments` table
+6. Monitoring tracks unacknowledged events
+
+### Dead Letter Queue (DLQ)
+
+**Purpose:** Handle events that failed after maximum retry attempts
+
+**Operations:**
+- `GET /api/dlq` - List DLQ items
+- `GET /api/dlq?stats=true` - Get DLQ statistics
+- `POST /api/dlq/retry/[eventId]` - Retry failed event
+- `POST /api/dlq/resolve/[eventId]` - Mark as resolved
+
+**DLQ Population:**
+- Webhook processing failures (after max retries)
+- SSE delivery failures (after max attempts)
+- Desktop processing failures (acknowledged with `status: "failed"`)
+
+### Retry Mechanism
+
+**Automatic Retries:**
+- Stripe webhook retries (automatic, exponential backoff)
+- Cron job retry processing: `/cron/retry-events`
+- SSE event retry via missed events endpoint
+
+**Manual Retries:**
+- DLQ retry endpoint
+- Webhook replay endpoint: `/stripe/webhooks/replay`
+
+---
+
+## Monitoring & Observability
+
+### Health Monitoring
+
+**Endpoints:**
+- `GET /api/monitoring/health` - System health status
+- `GET /api/monitoring/event-durability` - Event durability metrics
+- `GET /api/health/sse` - SSE connection health
+
+**Metrics Tracked:**
+- Webhook processing success rate
+- Event acknowledgment rate
+- DLQ size and age
+- SSE connection count
+- Average response times
+
+### Scheduled Health Checks
+
+**Cron Jobs:**
+- `/cron/health-monitoring` - System health monitoring
+- `/cron/detect-stale-sessions` - Detect stale SSE connections
+- `/cron/cleanup-events` - Clean up old events
+
+---
+
+## Database Schema Overview
+
+### Core Tables
+
+- **`subscriptions`** - Active and historical subscription records
+- **`customers`** - Customer records linked to users
+- **`licenseKeys`** - License key definitions
+- **`activations`** - License activations per machine
+- **`payments`** - Payment transaction records
+- **`invoices`** - Invoice records from Stripe
+- **`subscriptionChanges`** - Audit trail of subscription modifications
+
+### Event Tables
+
+- **`subscriptionEvents`** - Events published to SSE clients
+- **`eventAcknowledgments`** - Desktop app event acknowledgments
+- **`webhookEvents`** - Webhook event deduplication and tracking
+- **`deadLetterQueue`** - Failed events requiring manual intervention
+
+### Audit & Tracking
+
+- **`subscriptionChanges`** - Complete audit trail
+- **`webhookEvents`** - Webhook processing history
+- **`eventAcknowledgments`** - Desktop processing history
 
 ---
 
 ## Conclusion
 
-Your API architecture demonstrates:
+The AuraSwift API architecture provides:
 
-1. ✅ **Clear separation** between user actions and automatic events
-2. ✅ **Dual hybrid approach** properly implemented
-3. ✅ **Intuitive folder structure** that matches URL patterns
-4. ✅ **Security layers** at multiple levels
-5. ✅ **Error handling** appropriate for each route type
-6. ✅ **Real-time sync** via SSE for desktop apps
-7. ✅ **Scalable design** for future growth
-
-**Rating:** 9/10 - Excellent architecture! 🎉
+1. **Clear separation** between user actions and automatic events
+2. **Dual hybrid approach** for optimal performance and reliability
+3. **Real-time synchronization** via SSE for desktop apps
+4. **Event durability** with acknowledgment and retry mechanisms
+5. **Comprehensive monitoring** for system health
+6. **Scalable design** for future growth
+7. **Security layers** at multiple levels
+8. **Error handling** appropriate for each route type
 
 ---
 
-**Last Updated:** January 6, 2025 (Post-Migration Update)  
-**Document Type:** Architecture Diagram  
-**Migration Status:** ✅ Complete - Reflects current project structure
+**Last Updated:** January 9, 2025  
+**Document Type:** Architecture Documentation  
+**Version:** 2.0

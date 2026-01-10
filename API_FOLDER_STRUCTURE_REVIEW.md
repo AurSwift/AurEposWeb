@@ -1,655 +1,460 @@
-# API Folder Structure Review - Dual Hybrid Approach
+# API Folder Structure Documentation
 
-## Executive Summary
-
-**Rating: ✅ Excellent (10/10)** - Your API folder structure follows best practices for a dual hybrid architecture (Direct API + Webhooks). The separation of concerns is clean and intuitive.
-
-**Migration Status:** ✅ **Complete** - All suggested improvements have been implemented (January 6, 2025)
-
-**Key Improvements Implemented:**
-
-- ✅ Stripe operations grouped by category (checkout, subscriptions, webhooks, billing)
-- ✅ Subscription-related routes consolidated (`billing-history` and `plans` moved under `/subscriptions/`)
-- ✅ Consistent route depth throughout
-- ✅ Better organization for scalability
+**Last Updated:** January 9, 2025  
+**Status:** Current documentation of API structure
 
 ---
 
-## Folder Structure Overview
+## Overview
+
+This document describes the API folder structure for the AuraSwift web application. The API follows a dual hybrid architecture pattern combining Direct API routes (user-initiated) with Webhook routes (Stripe-initiated) for subscription management.
+
+---
+
+## Folder Structure
 
 ```
 /web/app/api/
-├── auth/                      # Authentication & user management
-│   ├── [...nextauth]/        # NextAuth.js handler
-│   ├── forgot-password/
-│   ├── reset-password/
-│   ├── signup/
-│   ├── verify-email/
-│   └── resend-verification/
+├── admin/                      # Administrative operations
+│   ├── customers/             # Admin customer management
+│   ├── licenses/              # Admin license management
+│   │   └── [licenseId]/
+│   │       └── revoke/        # Revoke license
+│   ├── stats/                 # Admin statistics
+│   └── support/               # Admin support ticket management
+│       └── [ticketId]/
+│           └── respond/       # Respond to support ticket
 │
-├── stripe/                    # Stripe-specific operations (REORGANIZED)
-│   ├── checkout/              # ✅ Checkout operations
-│   │   └── create/            # 👤 USER: Create checkout session
-│   ├── subscriptions/         # ✅ Subscription operations
-│   │   └── sync/              # 👤 USER: Manual sync (dev mode)
-│   ├── webhooks/              # ✅ Webhook handling
-│   │   └── handler/           # ⚡ WEBHOOK: Automatic events
-│   └── billing/               # ✅ Billing operations
-│       ├── portal/            # 👤 USER: Billing portal access
-│       └── payment-method/    # 👤 USER: Update payment method
+├── analytics/                  # Analytics and reporting
+│   ├── health/                # Health analytics
+│   ├── patterns/              # Usage patterns
+│   └── trends/                # Usage trends
 │
-├── subscriptions/             # Subscription management (EXPANDED)
-│   ├── cancel/               # 👤 USER: Cancel subscription
-│   ├── reactivate/           # 👤 USER: Reactivate subscription
-│   ├── change-plan/          # 👤 USER: Change plan/billing
-│   ├── current/              # 📊 READ: Get current subscription
-│   ├── history/              # 📊 READ: Subscription change history
-│   ├── billing-history/      # ✅ MOVED: Billing records
-│   └── plans/                # ✅ MOVED: Plan information
+├── auth/                       # Authentication & user management
+│   ├── [...nextauth]/         # NextAuth.js handler
+│   ├── forgot-password/       # Password recovery
+│   ├── reset-password/        # Password reset
+│   ├── signup/                # User registration
+│   ├── verify-email/          # Email verification
+│   └── resend-verification/   # Resend verification email
 │
-├── license/                   # License key management
-│   ├── activate/             # 🖥️ DESKTOP: Activate license
-│   ├── deactivate/           # 🖥️ DESKTOP: Deactivate license
-│   ├── validate/             # 🖥️ DESKTOP: Validate license
-│   └── heartbeat/            # 🖥️ DESKTOP: Send heartbeat
+├── cron/                       # Scheduled background tasks
+│   ├── analytics/             # Analytics processing
+│   ├── cleanup-events/        # Event cleanup
+│   ├── detect-stale-sessions/ # Detect stale SSE sessions
+│   ├── expiration-check/      # Check expired subscriptions
+│   ├── health-monitoring/     # Health monitoring
+│   └── retry-events/          # Retry failed events
 │
-├── events/                    # Real-time sync
-│   └── [licenseKey]/         # 📡 SSE: Server-Sent Events endpoint
+├── data/                       # Data operations
+│   └── export/                # Export user data
 │
-├── payments/                  # Payment tracking
-│   └── history/              # 📊 READ: Payment history
+├── dlq/                        # Dead Letter Queue management
+│   ├── route.ts               # List DLQ items & stats
+│   ├── resolve/[eventId]/     # Resolve DLQ item
+│   └── retry/[eventId]/       # Retry DLQ item
 │
-├── terminals/                 # Terminal management
-│   └── route.ts              # 📊 READ: Get terminals
+├── events/                     # Real-time event streaming
+│   ├── [licenseKey]/          # SSE endpoint for license key
+│   │   └── missed/            # Fetch missed events
+│   └── acknowledge/           # Event acknowledgment
 │
-├── cron/                      # Scheduled tasks
-│   └── expiration-check/     # ⏰ CRON: Check expired subscriptions
+├── health/                     # Health check endpoints
+│   └── sse/                   # SSE health check
 │
-├── data/                      # Data export
-│   └── export/               # 📊 READ: Export user data
+├── invoices/                   # Invoice management
+│   └── history/               # Invoice history
 │
-├── profile/                   # User profile
-│   └── route.ts              # 📊 READ/UPDATE: User profile
+├── license/                    # License key management
+│   ├── activate/              # Activate license
+│   ├── deactivate/            # Deactivate license
+│   ├── validate/              # Validate license
+│   └── heartbeat/             # Keep-alive signal
 │
-├── user/                      # User information
-│   └── route.ts              # 📊 READ: User details
+├── monitoring/                 # System monitoring
+│   ├── event-durability/      # Event durability monitoring
+│   └── health/                # System health monitoring
 │
-└── support/                   # Support requests
-    └── route.ts              # 📝 CREATE: Submit support ticket
+├── payments/                   # Payment tracking
+│   └── history/               # Payment history
+│
+├── profile/                    # User profile
+│   └── route.ts               # Get/update user profile
+│
+├── releases/                   # Release management
+│   └── latest/                # Get latest release info
+│
+├── stripe/                     # Stripe integration layer
+│   ├── billing/               # Billing operations
+│   │   ├── portal/            # Billing portal access
+│   │   └── payment-method/    # Payment method management
+│   ├── checkout/              # Checkout operations
+│   │   └── create/            # Create checkout session
+│   ├── subscriptions/         # Subscription sync operations
+│   │   └── route.ts           # Subscription sync endpoint
+│   ├── sync/                  # General Stripe sync
+│   │   └── route.ts           # Sync payment methods & invoices
+│   └── webhooks/              # Webhook handling
+│       ├── handler/           # Main webhook handler
+│       └── replay/            # Webhook replay
+│
+├── subscriptions/              # Subscription management
+│   ├── cancel/                # Cancel subscription
+│   ├── reactivate/            # Reactivate subscription
+│   ├── change-plan/           # Change plan/billing
+│   ├── current/               # Get current subscription
+│   ├── history/               # Subscription change history
+│   ├── billing-history/       # Billing records
+│   ├── plans/                 # Plan information
+│   └── preview-change/        # Preview plan change impact
+│
+├── support/                    # Support requests
+│   └── route.ts               # Submit support ticket
+│
+├── terminal-sessions/          # Terminal session management
+│   └── route.ts               # Terminal sessions operations
+│
+├── terminals/                  # Terminal management
+│   ├── route.ts               # Get terminals
+│   ├── broadcast/             # Broadcast to terminals
+│   └── sync/                  # Sync terminal data
+│
+├── test/                       # Testing endpoints
+│   ├── sse-status/            # SSE connection status test
+│   └── trigger-revoke/        # Trigger license revocation test
+│
+└── user/                       # User information
+    └── route.ts               # Get user details
 ```
 
 ---
 
-## ✅ Excellent Design Patterns
+## Route Categories
 
-### 1. **Clear Separation of Concerns**
+### Authentication Routes (`/auth/`)
 
-#### `/stripe/` - Stripe Integration Layer
+**Purpose:** User authentication and account management
 
-- **Purpose:** All Stripe-specific operations
-- **Pattern:** Gateway/Adapter pattern with categorized grouping
-- **Hybrid Approach:**
-  - `webhooks/handler/` → Handles automatic Stripe events (webhook-based)
-  - `checkout/create/` → User initiates checkout (direct API)
-  - `subscriptions/sync/` → Manual sync for development (direct API)
-  - `billing/portal/` → Access Stripe billing portal (direct API)
-  - `billing/payment-method/` → Manage payment methods (direct API)
+**Routes:**
+- `POST /api/auth/signup` - Create new user account
+- `POST /api/auth/[...nextauth]` - NextAuth.js authentication endpoints
+- `POST /api/auth/forgot-password` - Request password reset
+- `POST /api/auth/reset-password` - Reset password with token
+- `POST /api/auth/verify-email` - Verify email address
+- `POST /api/auth/resend-verification` - Resend verification email
 
-**Structure:**
-
-- ✅ **`checkout/`** - All checkout-related operations
-- ✅ **`subscriptions/`** - Subscription sync operations
-- ✅ **`webhooks/`** - Webhook handling (allows for future webhook routes)
-- ✅ **`billing/`** - All billing-related operations (portal, payment methods)
-
-**Verdict:** ✅ Excellent organization. Stripe concerns isolated and well-categorized.
+**Pattern:** Standard authentication flow with email verification
 
 ---
 
-#### `/subscriptions/` - User-Initiated Actions
+### Stripe Integration Routes (`/stripe/`)
 
-- **Purpose:** All user-controlled subscription operations
-- **Pattern:** Command pattern (user commands)
-- **Hybrid Approach:** All routes use direct API + immediate DB updates
+**Purpose:** Direct Stripe API operations and webhook handling
 
-Routes:
+**Organization:**
+- **`checkout/`** - Checkout session creation
+- **`subscriptions/`** - Subscription synchronization
+- **`sync/`** - General Stripe data sync (payment methods, invoices)
+- **`webhooks/`** - Webhook event processing
+- **`billing/`** - Billing portal and payment method management
 
-- `cancel/` → POST: Cancel subscription immediately
-- `reactivate/` → POST: Reactivate cancelled subscription
-- `change-plan/` → POST: Change plan/billing cycle
-- `current/` → GET: Fetch current subscription
-- `history/` → GET: Fetch subscription change audit trail
-- `billing-history/` → GET: Fetch billing history (moved from `/api/billing-history/`)
-- `plans/` → GET: Fetch available plans (moved from `/api/plans/`)
+**Direct API Routes (User-Initiated):**
+- `POST /api/stripe/checkout/create` - Create Stripe checkout session
+- `POST /api/stripe/subscriptions` - Sync subscription from Stripe
+- `POST /api/stripe/sync` - Sync payment methods and invoices from Stripe
+- `POST /api/stripe/billing/portal` - Create billing portal session
+- `GET /api/stripe/billing/payment-method` - Get payment methods
 
-**Verdict:** ✅ Excellent. All subscription-related routes consolidated in one place.
+**Webhook Routes (Stripe-Initiated):**
+- `POST /api/stripe/webhooks/handler` - Main webhook handler for Stripe events
+- `POST /api/stripe/webhooks/replay` - Replay webhook events
 
----
-
-#### `/license/` - Desktop App Integration
-
-- **Purpose:** License key operations for desktop application
-- **Pattern:** Validation/Activation pattern
-- **Consumer:** Desktop Electron app
-
-Routes:
-
-- `activate/` → POST: Activate license on machine
-- `deactivate/` → POST: Deactivate license
-- `validate/` → POST: Validate license status
-- `heartbeat/` → POST: Send heartbeat (keep-alive)
-
-**Verdict:** ✅ Perfect isolation of desktop concerns.
-
----
-
-### 2. **RESTful Route Organization**
-
-Each folder represents a **resource** with clear CRUD operations:
-
-```
-/subscriptions/
-  - cancel/          → POST (Action verb, acceptable for state change)
-  - reactivate/      → POST (Action verb, acceptable for state change)
-  - change-plan/     → POST (Action verb, acceptable for state change)
-  - current/         → GET (Read current state)
-  - history/         → GET (Read historical data)
-```
-
-**Pattern Analysis:**
-
-- ✅ Use of action verbs (`cancel`, `reactivate`) for state transitions
-- ✅ Resource nouns (`current`, `history`) for data retrieval
-- ✅ Consistent HTTP methods (POST for mutations, GET for reads)
+**Supported Webhook Events:**
+- `checkout.session.completed` - Creates subscription
+- `customer.subscription.updated` - Updates subscription
+- `customer.subscription.deleted` - Cancels subscription
+- `invoice.payment_succeeded` - Records successful payment
+- `invoice.payment_failed` - Marks subscription as past_due
+- `customer.updated` - Updates customer data
+- `customer.deleted` - Handles customer deletion
+- `payment_method.attached` - Records payment method attachment
+- `payment_method.detached` - Records payment method removal
+- `invoice.created` / `invoice.updated` - Invoice lifecycle events
+- `invoice.paid` - Invoice payment confirmation
 
 ---
 
-### 3. **Dual Hybrid Architecture Clearly Visible**
+### Subscription Management Routes (`/subscriptions/`)
 
-#### Webhook Route (Automatic Events)
+**Purpose:** User-controlled subscription operations
 
-**Location:** `/stripe/webhooks/handler/route.ts`
+**Routes:**
+- `POST /api/subscriptions/cancel` - Cancel subscription immediately
+- `POST /api/subscriptions/reactivate` - Reactivate cancelled subscription
+- `POST /api/subscriptions/change-plan` - Change plan or billing cycle
+- `POST /api/subscriptions/preview-change` - Preview plan change impact (proration)
+- `GET /api/subscriptions/current` - Get current subscription
+- `GET /api/subscriptions/history` - Get subscription change audit trail
+- `GET /api/subscriptions/billing-history` - Get billing history
+- `GET /api/subscriptions/plans` - Get available plans
 
-**Handles:**
-
-- `checkout.session.completed` → Creates subscription
-- `customer.subscription.updated` → Updates subscription
-- `customer.subscription.deleted` → Deletes subscription
-- `invoice.payment_succeeded` → Records payment
-- `invoice.payment_failed` → Marks past_due
-
-**Pattern:** Event-driven, asynchronous, Stripe-initiated
-
-**Note:** Located in `/webhooks/handler/` to allow for future webhook-related routes (e.g., `/webhooks/retry/`, `/webhooks/logs/`)
+**Pattern:** All routes require authentication and update database immediately after Stripe API calls
 
 ---
 
-#### Direct API Routes (User-Initiated Actions)
+### License Management Routes (`/license/`)
 
-**Locations:**
+**Purpose:** Desktop application license operations
 
-- `/subscriptions/cancel/route.ts`
-- `/subscriptions/reactivate/route.ts`
-- `/subscriptions/change-plan/route.ts`
-- `/stripe/subscriptions/sync/route.ts`
-- `/stripe/checkout/create/route.ts`
-- `/stripe/billing/portal/route.ts`
-- `/stripe/billing/payment-method/route.ts`
+**Routes:**
+- `POST /api/license/activate` - Activate license on machine
+- `POST /api/license/deactivate` - Deactivate license
+- `POST /api/license/validate` - Validate license status
+- `POST /api/license/heartbeat` - Send keep-alive signal
 
-**Pattern:** Request-response, synchronous, user-initiated
-
-**Flow:**
-
-1. User action → API route
-2. Call Stripe API
-3. Update database immediately
-4. Return response
-5. Publish SSE event (optional)
+**Consumer:** Desktop Electron application  
+**Authentication:** License key + machine fingerprint validation
 
 ---
 
-## ✅ Additional Excellent Patterns
+### Real-Time Event Streaming (`/events/`)
 
-### 4. **SSE Integration**
+**Purpose:** Server-Sent Events (SSE) for real-time desktop app notifications
 
-**Location:** `/events/[licenseKey]/route.ts`
+**Routes:**
+- `GET /api/events/[licenseKey]` - SSE stream for subscription events
+- `GET /api/events/[licenseKey]/missed` - Fetch missed events
+- `POST /api/events/acknowledge` - Acknowledge event processing
+- `GET /api/events/acknowledge?eventId={id}` - Get acknowledgment status
 
-**Purpose:** Real-time notifications to desktop apps
-
-**Pattern:** Server-Sent Events (SSE) for push notifications
-
-**Integration with Hybrid Approach:**
-
-- Webhook events → Publish to SSE → Desktop notified
-- Direct API events → Publish to SSE → Desktop notified
-
-**Verdict:** ✅ Perfect for real-time sync without polling.
+**Pattern:** Redis pub/sub for event distribution across server instances
 
 ---
 
-### 5. **CRON Job Integration**
+### Administrative Routes (`/admin/`)
 
-**Location:** `/cron/expiration-check/route.ts`
+**Purpose:** Administrative operations (admin-only)
 
-**Purpose:** Scheduled background tasks
+**Routes:**
+- `GET /api/admin/customers` - List all customers
+- `GET /api/admin/stats` - System statistics
+- `POST /api/admin/licenses/[licenseId]/revoke` - Revoke license
+- `POST /api/admin/support/[ticketId]/respond` - Respond to support ticket
 
-**Pattern:** Cron job endpoint (Vercel cron)
-
-**Use Case:**
-
-- Check for expired subscriptions
-- Handle grace period expiration
-- Cleanup inactive licenses
-
-**Verdict:** ✅ Good fallback for webhook failures.
+**Authentication:** Admin role required
 
 ---
 
-### 6. **Read vs Write Separation**
+### Analytics Routes (`/analytics/`)
 
-#### Read-Only Routes (GET)
+**Purpose:** Usage analytics and reporting
 
-- `/subscriptions/current/` → Fetch current subscription
-- `/subscriptions/history/` → Fetch change history
-- `/subscriptions/billing-history/` → Fetch billing records (moved from `/api/billing-history/`)
-- `/subscriptions/plans/` → Fetch available plans (moved from `/api/plans/`)
-- `/payments/history/` → Fetch payment history
-- `/terminals/` → Fetch terminal list
-- `/stripe/billing/payment-method/` → Fetch payment method
-
-**Pattern:** Query pattern (CQRS-lite)
-
-#### Write Routes (POST)
-
-- `/subscriptions/cancel/` → Mutate state
-- `/subscriptions/reactivate/` → Mutate state
-- `/subscriptions/change-plan/` → Mutate state
-- `/license/activate/` → Mutate state
-
-**Pattern:** Command pattern (CQRS-lite)
-
-**Verdict:** ✅ Clear separation improves maintainability.
+**Routes:**
+- `GET /api/analytics/health` - Health analytics
+- `GET /api/analytics/patterns` - Usage patterns
+- `GET /api/analytics/trends` - Usage trends
 
 ---
 
-## 📊 Route Classification
+### Dead Letter Queue (`/dlq/`)
 
-### By Purpose
+**Purpose:** Management of failed events that require manual intervention
 
-| Category                | Routes | Pattern        | Example                     |
-| ----------------------- | ------ | -------------- | --------------------------- |
-| **User Actions**        | 7      | Direct API     | `/subscriptions/cancel/`    |
-| **Webhook Events**      | 1      | Event-driven   | `/stripe/webhooks/handler/` |
-| **Read Operations**     | 8      | Query pattern  | `/subscriptions/current/`   |
-| **Desktop Integration** | 4      | Client-server  | `/license/activate/`        |
-| **Real-time Sync**      | 1      | SSE            | `/events/[licenseKey]/`     |
-| **Background Jobs**     | 1      | Cron           | `/cron/expiration-check/`   |
-| **Stripe Integration**  | 5      | Gateway        | `/stripe/checkout/create/`  |
-| **Auth**                | 6      | Authentication | `/auth/signup/`             |
+**Routes:**
+- `GET /api/dlq` - List DLQ items (with optional status filter)
+- `GET /api/dlq?stats=true` - Get DLQ statistics
+- `POST /api/dlq/retry/[eventId]` - Retry failed event
+- `POST /api/dlq/resolve/[eventId]` - Mark event as resolved
+
+**Use Case:** Events that failed processing after multiple retry attempts
 
 ---
 
-### By HTTP Method
+### Scheduled Tasks (`/cron/`)
 
-| Method | Count | Purpose             |
-| ------ | ----- | ------------------- |
-| GET    | 10    | Read operations     |
-| POST   | 20    | Mutations, commands |
+**Purpose:** Background jobs executed on a schedule (Vercel Cron)
 
----
+**Routes:**
+- `GET /api/cron/analytics` - Process analytics data
+- `GET /api/cron/cleanup-events` - Clean up old events
+- `GET /api/cron/detect-stale-sessions` - Detect stale SSE connections
+- `GET /api/cron/expiration-check` - Check for expired subscriptions
+- `POST /api/cron/expiration-check` - Manual expiration check trigger
+- `GET /api/cron/health-monitoring` - System health monitoring
+- `GET /api/cron/retry-events` - Retry failed events
 
-## 🎯 Strengths
-
-### 1. **Intuitive Organization**
-
-- Developer can easily find subscription routes in `/subscriptions/`
-- Stripe-specific code isolated in `/stripe/`
-- License operations clearly in `/license/`
-
-### 2. **Scalability**
-
-- Easy to add new subscription actions (e.g., `/subscriptions/pause/`)
-- Easy to add new Stripe operations (e.g., `/stripe/refund/`)
-- Easy to add new license operations (e.g., `/license/transfer/`)
-
-### 3. **Maintainability**
-
-- Clear separation of concerns
-- Single Responsibility Principle
-- Each route file has one job
-
-### 4. **Testability**
-
-- Each route can be tested independently
-- Mock Stripe API easily
-- Test webhook handler separately from user actions
-
-### 5. **Discoverability**
-
-- File structure matches URL structure
-- Easy to navigate
-- Self-documenting
+**Pattern:** Cron job endpoints called by Vercel Cron scheduler
 
 ---
 
-## ⚠️ Minor Suggestions
+### Monitoring Routes (`/monitoring/`)
 
-### 1. **Route Depth Consistency** ✅ **IMPLEMENTED**
+**Purpose:** System health and performance monitoring
 
-**Previous Structure:**
-
-```
-/subscriptions/cancel/route.ts        # Depth: 2
-/subscriptions/current/route.ts       # Depth: 2
-/billing-history/route.ts             # Depth: 1
-/plans/route.ts                       # Depth: 1
-```
-
-**Current Structure (After Migration):**
-
-```
-/subscriptions/cancel/route.ts        # Depth: 2
-/subscriptions/current/route.ts       # Depth: 2
-/subscriptions/billing-history/route.ts  # ✅ MOVED - Depth: 2
-/subscriptions/plans/route.ts         # ✅ MOVED - Depth: 2
-```
-
-**Result:** ✅ All subscription-related routes now have consistent depth and are grouped together.
-
-**Verdict:** ✅ **COMPLETED** - Structure is now consistent.
+**Routes:**
+- `GET /api/monitoring/event-durability` - Event durability metrics
+- `GET /api/monitoring/health` - System health status
 
 ---
 
-### 2. **Consider Adding `/subscriptions/[id]/` Route**
+### Terminal Management (`/terminals/`)
 
-**Current:**
+**Purpose:** Terminal device management
 
-```
-/subscriptions/current/     # Get current subscription
-/subscriptions/history/     # Get history
-```
-
-**Suggested Addition:**
-
-```
-/subscriptions/[id]/        # Get specific subscription by ID
-```
-
-**Use Case:**
-
-- Fetching archived subscriptions
-- Admin viewing any subscription
-- Detailed subscription view
-
-**Verdict:** ⚠️ Minor - not needed currently, but consider for future.
+**Routes:**
+- `GET /api/terminals` - Get all terminals for user
+- `POST /api/terminals/broadcast` - Broadcast message to terminals
+- `POST /api/terminals/sync` - Sync terminal data
 
 ---
 
-### 3. **Stripe Operations Grouping** ✅ **IMPLEMENTED**
+### Other Routes
 
-**Previous Structure:**
+**Payments:**
+- `GET /api/payments/history` - Payment history
 
-```
-/stripe/create-checkout/
-/stripe/sync-subscription/
-/stripe/webhook/
-/stripe/portal/
-/stripe/payment-method/
-```
+**Invoices:**
+- `GET /api/invoices/history` - Invoice history
 
-**Current Structure (After Migration):**
+**User Profile:**
+- `GET /api/profile` - Get user profile
+- `PUT /api/profile` - Update user profile
 
-```
-/stripe/
-  ├── checkout/
-  │   └── create/              # ✅ MOVED
-  ├── subscriptions/
-  │   └── sync/                # ✅ MOVED
-  ├── webhooks/
-  │   └── handler/             # ✅ MOVED
-  └── billing/
-      ├── portal/              # ✅ MOVED
-      └── payment-method/      # ✅ MOVED
-```
+**User Information:**
+- `GET /api/user` - Get user details
 
-**Benefits Achieved:**
+**Support:**
+- `POST /api/support` - Submit support ticket
 
-- ✅ More granular organization
-- ✅ Easier to add related routes (e.g., `/checkout/session/`, `/billing/invoices/`)
-- ✅ Clear categorization by operation type
-- ✅ Better scalability for future features
+**Data Export:**
+- `GET /api/data/export` - Export user data (GDPR compliance)
 
-**Verdict:** ✅ **COMPLETED** - Stripe operations are now properly categorized.
+**Releases:**
+- `GET /api/releases/latest` - Get latest release information
+
+**Terminal Sessions:**
+- `GET /api/terminal-sessions` - Get terminal session data
+
+**Health Checks:**
+- `GET /api/health/sse` - SSE health check
+
+**Testing:**
+- `GET /api/test/sse-status` - Test SSE connection status
+- `POST /api/test/trigger-revoke` - Test license revocation trigger
 
 ---
 
-## ✅ Best Practices Followed
+## Architecture Patterns
 
-### 1. **Next.js App Router Convention**
+### Dual Hybrid Approach
 
-- ✅ Each route in its own folder with `route.ts`
-- ✅ Dynamic routes use `[param]/` notation
-- ✅ API routes in `/app/api/` directory
+The API implements a dual hybrid architecture:
 
-### 2. **RESTful API Design**
+1. **Direct API Routes** (User-initiated, synchronous)
+   - User actions trigger immediate Stripe API calls
+   - Database updated immediately
+   - Response returned to user (~250ms)
+   - Examples: `/subscriptions/cancel`, `/subscriptions/change-plan`
 
-- ✅ Resource-based URLs (`/subscriptions/`, `/licenses/`)
-- ✅ HTTP methods match operations (GET, POST)
-- ✅ Clear action verbs for state changes (`cancel`, `reactivate`)
+2. **Webhook Routes** (Stripe-initiated, asynchronous)
+   - Stripe events trigger webhook handler
+   - Background processing (1-5 second delay acceptable)
+   - Database updated asynchronously
+   - Examples: `/stripe/webhooks/handler`
 
-### 3. **Separation of Concerns**
+### Event Distribution Pattern
 
-- ✅ Stripe operations isolated
-- ✅ User actions separate from automatic events
-- ✅ Read operations separate from writes
+**Real-time sync via SSE:**
+- Both webhook events and direct API actions publish to Redis
+- SSE endpoint (`/events/[licenseKey]`) streams events to desktop apps
+- Desktop apps acknowledge events via `/events/acknowledge`
+- Failed events enter Dead Letter Queue for retry
 
-### 4. **Single Responsibility**
+### Security Layers
 
-- ✅ Each route has one clear purpose
-- ✅ No route handles multiple unrelated operations
-
-### 5. **Security**
-
-- ✅ Auth routes separate (`/auth/`)
-- ✅ License routes secured (require machine fingerprint)
-- ✅ User routes require authentication (via `requireAuth()`)
-
----
-
-## 📋 Dual Hybrid Implementation Evidence
-
-### User-Initiated Actions (Direct API)
-
-| Route                         | Purpose                 | Stripe Call                              | DB Update | Response Time |
-| ----------------------------- | ----------------------- | ---------------------------------------- | --------- | ------------- |
-| `/subscriptions/cancel/`      | Cancel subscription     | `stripe.subscriptions.cancel()`          | Immediate | ~250ms        |
-| `/subscriptions/reactivate/`  | Reactivate subscription | `stripe.subscriptions.update()`          | Immediate | ~250ms        |
-| `/subscriptions/change-plan/` | Change plan             | `stripe.subscriptions.update()`          | Immediate | ~250ms        |
-| `/stripe/checkout/create/`    | Create checkout session | `stripe.checkout.sessions.create()`      | Immediate | ~300ms        |
-| `/stripe/subscriptions/sync/` | Sync subscription       | `stripe.subscriptions.retrieve()`        | Immediate | ~400ms        |
-| `/stripe/billing/portal/`     | Access billing portal   | `stripe.billingPortal.sessions.create()` | Immediate | ~200ms        |
-
-**Pattern:** Synchronous, user-initiated, immediate feedback
+1. **Authentication:** NextAuth.js session validation
+2. **Authorization:** Customer ownership validation via `requireAuth()` helper
+3. **Webhook Verification:** Stripe signature validation
+4. **Idempotency:** Webhook event deduplication via `webhookEvents` table
 
 ---
 
-### Automatic Events (Webhooks)
+## HTTP Method Conventions
 
-| Route                       | Event Type                      | Trigger | DB Update | Delay |
-| --------------------------- | ------------------------------- | ------- | --------- | ----- |
-| `/stripe/webhooks/handler/` | `checkout.session.completed`    | Stripe  | Async     | 1-5s  |
-| `/stripe/webhooks/handler/` | `customer.subscription.updated` | Stripe  | Async     | 1-5s  |
-| `/stripe/webhooks/handler/` | `customer.subscription.deleted` | Stripe  | Async     | 1-5s  |
-| `/stripe/webhooks/handler/` | `invoice.payment_succeeded`     | Stripe  | Async     | 1-5s  |
-| `/stripe/webhooks/handler/` | `invoice.payment_failed`        | Stripe  | Async     | 1-5s  |
-
-**Pattern:** Asynchronous, Stripe-initiated, background processing
+- **GET** - Read operations (queries)
+- **POST** - Mutations, commands, and state changes
+- **PUT** - Full resource updates
+- **DELETE** - Resource deletion (rare, prefer soft deletes)
 
 ---
 
-## 🎯 Overall Assessment
+## Route Organization Principles
 
-### ✅ Strengths
-
-1. **Clear separation** between Stripe, subscriptions, and licenses
-2. **Intuitive organization** - easy to find routes
-3. **Dual hybrid approach** clearly visible
-4. **RESTful conventions** followed
-5. **Scalable structure** - easy to extend
-
-### ✅ Completed Improvements
-
-1. ✅ **Stripe operations grouped** - All Stripe routes now categorized (checkout, subscriptions, webhooks, billing)
-2. ✅ **Billing history moved** - Now under `/subscriptions/billing-history/`
-3. ✅ **Plans moved** - Now under `/subscriptions/plans/`
-
-### ⚠️ Future Considerations
-
-1. Consider adding `/subscriptions/[id]/` for specific subscription queries
-2. Consider adding `/stripe/webhooks/retry/` for webhook retry management
-3. Consider adding `/stripe/billing/invoices/` for invoice management
-
-### ❌ No Major Issues Found
+1. **Resource-based URLs** - Routes organized by resource (`/subscriptions/`, `/license/`)
+2. **Action verbs for mutations** - Clear action names (`cancel`, `reactivate`, `change-plan`)
+3. **Nouns for queries** - Resource names for reads (`current`, `history`, `plans`)
+4. **Consistent depth** - Similar routes at same depth level
+5. **Category grouping** - Related routes grouped together (Stripe routes in `/stripe/`)
 
 ---
 
-## 📊 Comparison with Industry Standards
+## Database Schema Integration
 
-### ✅ Matches Industry Best Practices
+The API routes interact with the following main database tables:
 
-**Stripe Official Pattern:**
-
-```
-/api/stripe/
-  - webhooks/      ← Handle automatic events
-  - checkout/      ← Create checkout sessions
-  - billing/       ← Billing operations
-```
-
-**Your implementation:** ✅ **EXCEEDS** this pattern with better categorization
-
-**REST API Best Practices:**
-
-```
-/api/resource/
-  - [action]/      ← Action-based mutations
-  - [id]/          ← Resource-based queries
-```
-
-**Your implementation:** ✅ Follows this pattern
-
-**Next.js App Router Best Practices:**
-
-```
-/app/api/[resource]/[action]/route.ts
-```
-
-**Your implementation:** ✅ Follows this pattern
+- `subscriptions` - Subscription records
+- `customers` - Customer records
+- `licenseKeys` - License key records
+- `activations` - License activations per machine
+- `payments` - Payment records
+- `invoices` - Invoice records
+- `subscriptionChanges` - Subscription change audit trail
+- `webhookEvents` - Webhook deduplication
+- `subscriptionEvents` - Events published to SSE
+- `eventAcknowledgments` - Desktop app event acknowledgments
+- `deadLetterQueue` - Failed events requiring manual intervention
 
 ---
 
-## 🔄 Workflow Examples
+## Error Handling
 
-### Example 1: User Cancels Subscription
+**Direct API Routes:**
+- Errors caught and returned as user-friendly messages
+- HTTP status codes: 400 (validation), 404 (not found), 500 (server error)
+- Errors logged for debugging
 
-**Request Flow:**
+**Webhook Routes:**
+- Errors marked in `webhookEvents` table
+- Return 500 status to trigger Stripe retry
+- Failed events enter Dead Letter Queue after max retries
 
+---
+
+## Response Format
+
+All API routes use consistent response helpers:
+
+**Success Response:**
+```typescript
+{
+  success: true,
+  data: { ... }
+}
 ```
-1. User clicks "Cancel" in dashboard
-   ↓
-2. POST /api/subscriptions/cancel
-   ↓
-3. Route calls stripe.subscriptions.cancel()
-   ↓
-4. Route updates database immediately
-   ↓
-5. Route publishes SSE event to desktop apps
-   ↓
-6. Returns success response to user
-   ↓
-7. User sees confirmation (250ms total)
-```
 
-**File Structure:**
-
-```
-/subscriptions/cancel/route.ts         ← User-initiated
-/events/[licenseKey]/route.ts          ← SSE notification
+**Error Response:**
+```typescript
+{
+  success: false,
+  error: "Error message",
+  code?: "ERROR_CODE"
+}
 ```
 
 ---
 
-### Example 2: Automatic Subscription Renewal
+## Last Updated
 
-**Request Flow:**
-
-```
-1. Stripe automatically charges customer
-   ↓
-2. Stripe sends webhook event
-   ↓
-3. POST /api/stripe/webhooks/handler
-   ↓
-4. Route processes invoice.payment_succeeded
-   ↓
-5. Route updates database
-   ↓
-6. Route publishes SSE event to desktop apps
-   ↓
-7. Desktop apps receive notification
-```
-
-**File Structure:**
-
-```
-/stripe/webhooks/handler/route.ts      ← Webhook handler
-/events/[licenseKey]/route.ts          ← SSE notification
-```
-
----
-
-## 📝 Summary
-
-### Overall Rating: ✅ Excellent (9/10)
-
-**What you're doing right:**
-
-- ✅ Clear separation of concerns
-- ✅ Intuitive folder structure
-- ✅ Dual hybrid approach properly implemented
-- ✅ RESTful conventions followed
-- ✅ Scalable and maintainable
-- ✅ Follows Next.js best practices
-- ✅ Follows Stripe best practices
-
-**Completed improvements:**
-
-- ✅ Stripe operations properly grouped and categorized
-- ✅ Subscription-related routes consolidated
-- ✅ Consistent route depth throughout
-
-**Future considerations:**
-
-- ⚠️ Consider adding `/subscriptions/[id]/` for specific subscription queries
-- ⚠️ Consider adding more webhook management routes
-
-**Recommendation:** ✅ Keep your current structure. It's well-designed and follows best practices. The minor suggestions are optional optimizations.
-
----
-
-## 🎓 Key Takeaways
-
-1. **Dual hybrid approach is clearly visible** in folder structure
-2. **Separation between user actions and automatic events** is excellent
-3. **Resource-based organization** makes navigation intuitive
-4. **Scalability built-in** - easy to add new routes
-5. **Follows industry standards** - Stripe, REST, Next.js
-
-Your API folder structure is a **textbook example** of how to organize a dual hybrid subscription system. Well done! 🎉
-
----
-
-**Last Updated:** January 6, 2025 (Post-Migration Update)  
-**Reviewer:** AI Assistant  
-**Rating:** 10/10 - Excellent (All suggested improvements implemented)  
-**Migration Status:** ✅ Complete
+**Date:** January 9, 2025  
+**Version:** 2.0  
+**Status:** Current documentation
