@@ -65,9 +65,9 @@ const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
     },
   },
   enterprise: {
-    maxTerminals: -1, // Unlimited
+    maxTerminals: 50, // Up to 50 terminals for enterprise
     features: [
-      "Unlimited terminals",
+      "Up to 50 terminals",
       "Custom integrations",
       "Dedicated account manager",
       "24/7 phone support",

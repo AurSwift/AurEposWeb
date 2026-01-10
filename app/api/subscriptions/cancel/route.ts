@@ -10,6 +10,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import {
   publishSubscriptionCancelled,
+  publishLicenseRevoked,
   getLicenseKeysForSubscription,
 } from "@/lib/subscription-events";
 import { sendCancellationConfirmationEmail } from "@/lib/emails/trial-notifications";
@@ -25,6 +26,23 @@ import {
   calculatePaidCancellationGracePeriod,
 } from "@/lib/subscription/grace-period-helpers";
 
+/**
+ * POST /api/subscriptions/cancel
+ *
+ * Cancel a user's subscription (does NOT delete the customer account)
+ *
+ * IMPORTANT: This endpoint only cancels the subscription in Stripe and updates
+ * the subscription status in the database. It does NOT delete the customer.
+ * Customer deletion only happens when:
+ * 1. An admin explicitly deletes the customer in Stripe dashboard
+ * 2. Stripe sends a customer.deleted webhook event
+ *
+ * The customer account remains active with status="active" to allow:
+ * - Viewing billing history
+ * - Accessing the billing portal
+ * - Reactivating the subscription
+ * - Exporting data during grace period
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
@@ -59,30 +77,28 @@ export async function POST(request: NextRequest) {
       subscription.trialEnd &&
       subscription.trialEnd > now;
 
-    // Cancel in Stripe - Best Practice: Preserve trial access
-    if (cancelImmediately && !isInTrial) {
-      // Only allow immediate cancellation for paid subscriptions
+    // Implement proper cancellation based on user's choice
+    if (cancelImmediately) {
+      // IMMEDIATE CANCELLATION - Cancel NOW in Stripe (for both trial and paid)
       await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
     } else {
-      // During trial OR scheduled cancellation: cancel at period end
-      // This ensures users get full value of their trial/billing period
+      // CANCEL AT PERIOD END - Keep access until trial/billing period ends
       await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
         cancel_at_period_end: true,
       });
     }
 
-    // Determine effective cancellation behavior
-    const effectivelyImmediate = cancelImmediately && !isInTrial;
-
     // Update database in a transaction
+    // NOTE: This updates ONLY the subscription, NOT the customer
+    // Customer status remains "active" to allow portal access and reactivation
     await db.transaction(async (tx) => {
       // Update subscription
       await tx
         .update(subscriptions)
         .set({
-          cancelAtPeriodEnd: !effectivelyImmediate,
-          canceledAt: effectivelyImmediate ? new Date() : null,
-          status: effectivelyImmediate ? "canceled" : subscription.status,
+          cancelAtPeriodEnd: !cancelImmediately,
+          canceledAt: cancelImmediately ? new Date() : null,
+          status: cancelImmediately ? "canceled" : subscription.status,
           updatedAt: new Date(),
         })
         .where(eq(subscriptions.id, subscriptionId));
@@ -94,34 +110,33 @@ export async function POST(request: NextRequest) {
         changeType: "cancellation",
         reason:
           reason ||
-          (effectivelyImmediate
+          (cancelImmediately
             ? "Immediate cancellation"
-            : isInTrial
-            ? "Cancelled during trial - access preserved until trial end"
             : "Cancel at period end"),
-        effectiveDate: effectivelyImmediate
+        effectiveDate: cancelImmediately
           ? new Date()
           : subscription.trialEnd ||
             subscription.currentPeriodEnd ||
             new Date(),
         metadata: {
           cancelImmediately,
-          effectivelyImmediate,
           isInTrial,
           canceledBy: session.user.id,
           trialEndDate: subscription.trialEnd,
-          trialAccessPreserved: isInTrial && cancelImmediately, // User requested immediate but we preserved trial
         },
       });
 
-      // Revoke license keys only if truly immediate (not during trial)
-      if (effectivelyImmediate) {
+      // Revoke license keys ONLY if immediate cancellation
+      if (cancelImmediately) {
         await tx
           .update(licenseKeys)
           .set({
             isActive: false,
             revokedAt: new Date(),
-            revocationReason: "Subscription cancelled immediately",
+            revocationReason:
+              cancelImmediately && isInTrial
+                ? "Trial cancelled immediately"
+                : "Subscription cancelled immediately",
           })
           .where(eq(licenseKeys.subscriptionId, subscriptionId));
       }
@@ -130,9 +145,11 @@ export async function POST(request: NextRequest) {
     // 🔔 SSE: Notify desktop apps about cancellation (after transaction commits)
     const licenseKeysList = await getLicenseKeysForSubscription(subscriptionId);
 
-    // Calculate grace period end based on cancellation type using helper
-    const gracePeriodEnd = effectivelyImmediate
-      ? calculatePaidCancellationGracePeriod(subscription, new Date())
+    // Calculate grace period end based on cancellation type
+    const gracePeriodEnd = cancelImmediately
+      ? isInTrial
+        ? calculateTrialCancellationGracePeriod(subscription, new Date())
+        : calculatePaidCancellationGracePeriod(subscription, new Date())
       : isInTrial
       ? calculateTrialCancellationGracePeriod(subscription, new Date())
       : calculatePaidCancellationGracePeriod(subscription, new Date());
@@ -140,16 +157,24 @@ export async function POST(request: NextRequest) {
     for (const key of licenseKeysList) {
       publishSubscriptionCancelled(key, {
         cancelledAt: new Date(),
-        cancelImmediately: effectivelyImmediate,
+        cancelImmediately,
         gracePeriodEnd,
         reason:
           reason ||
-          (effectivelyImmediate
+          (cancelImmediately
             ? "Immediate cancellation"
-            : isInTrial
-            ? "Cancelled during trial - access preserved until trial end"
             : "Cancel at period end"),
       });
+
+      // 🔔 CRITICAL: Send license revocation event for immediate cancellations
+      // This ensures desktop app receives dual notification for immediate shutdown
+      if (cancelImmediately) {
+        publishLicenseRevoked(key, {
+          reason: isInTrial
+            ? "Trial cancelled immediately - license revoked"
+            : "Subscription cancelled immediately - license revoked",
+        });
+      }
     }
 
     // Send cancellation confirmation email
@@ -165,12 +190,13 @@ export async function POST(request: NextRequest) {
         email: user.email,
         userName: user.name || undefined,
         planName: subscription.planType || "Basic Plan",
-        accessEndDate: effectivelyImmediate
-          ? new Date() // Truly immediate (paid subscription only)
+        accessEndDate: cancelImmediately
+          ? new Date() // Immediate cancellation - access ends now
           : isInTrial
           ? subscription.trialEnd || new Date()
           : subscription.currentPeriodEnd || new Date(),
         wasInTrial: isInTrial || false,
+        cancelImmediately,
         exportDataUrl: `${process.env.NEXTAUTH_URL}/dashboard/export`,
       }).catch((error) => {
         console.error("Failed to send cancellation confirmation email:", error);
@@ -179,28 +205,30 @@ export async function POST(request: NextRequest) {
 
     // Return appropriate message based on what actually happened
     let responseMessage: string;
-    if (isInTrial && cancelImmediately) {
-      // User requested immediate, but we preserved trial - explain why
-      responseMessage = `We understand you want to cancel. To ensure you get full value of your trial, we've preserved your access until ${subscription.trialEnd?.toLocaleDateString()}. After that, you'll have a 7-day grace period to export your data.`;
-    } else if (effectivelyImmediate) {
-      // Truly immediate cancellation (paid subscription)
-      responseMessage =
-        "Subscription cancelled immediately. You have a 7-day grace period to export your data.";
-    } else if (isInTrial) {
-      // Normal trial cancellation
-      responseMessage = `Your trial will remain active until ${subscription.trialEnd?.toLocaleDateString()}. After that, you'll have a 7-day grace period.`;
+    if (cancelImmediately) {
+      // True immediate cancellation
+      if (isInTrial) {
+        responseMessage =
+          "Trial cancelled immediately. Your access has ended. You have a 7-day grace period to export your data.";
+      } else {
+        responseMessage =
+          "Subscription cancelled immediately. Your access has ended. You have a 7-day grace period to export your data.";
+      }
     } else {
       // Scheduled cancellation at period end
-      responseMessage = `Subscription will cancel at the end of the billing period on ${subscription.currentPeriodEnd?.toLocaleDateString()}. You'll have a 7-day grace period after that.`;
+      if (isInTrial) {
+        responseMessage = `Your trial will remain active until ${subscription.trialEnd?.toLocaleDateString()}. After that, you'll have a 7-day grace period to export your data.`;
+      } else {
+        responseMessage = `Subscription will cancel at the end of the billing period on ${subscription.currentPeriodEnd?.toLocaleDateString()}. You'll have a 7-day grace period after that.`;
+      }
     }
 
     return successResponse({
       success: true,
       message: responseMessage,
-      cancelledImmediately: effectivelyImmediate,
-      trialAccessPreserved: isInTrial && cancelImmediately,
+      cancelledImmediately: cancelImmediately,
       isInTrial,
-      accessUntil: effectivelyImmediate
+      accessUntil: cancelImmediately
         ? new Date()
         : isInTrial
         ? subscription.trialEnd

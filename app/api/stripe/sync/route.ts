@@ -1,0 +1,231 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api/auth-helpers";
+import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
+import { successResponse, handleApiError } from "@/lib/api/response-helpers";
+import { stripe } from "@/lib/stripe/client";
+import { db } from "@/lib/db";
+import { paymentMethods, invoices, subscriptions, payments } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
+import Stripe from "stripe";
+import { createPaymentFromInvoice } from "@/lib/db/payment-helpers";
+
+/**
+ * POST /api/stripe/sync
+ * Syncs existing payment methods and invoices from Stripe to database
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const session = await requireAuth();
+    const customer = await getCustomerOrThrow(session.user.id);
+
+    if (!customer.stripeCustomerId) {
+      return NextResponse.json(
+        { error: "No Stripe customer ID found" },
+        { status: 400 }
+      );
+    }
+
+    const stripeCustomerId = customer.stripeCustomerId;
+
+    // Sync payment methods
+    const paymentMethodsList = await stripe.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: "card",
+    });
+
+    let syncedPaymentMethods = 0;
+    let syncedInvoices = 0;
+    let syncedPayments = 0;
+
+    // Get default payment method from customer
+    const stripeCustomer = await stripe.customers.retrieve(stripeCustomerId);
+    const defaultPaymentMethodId =
+      (stripeCustomer as Stripe.Customer).invoice_settings
+        ?.default_payment_method;
+
+    for (const pm of paymentMethodsList.data) {
+      const baseData = {
+        customerId: customer.id,
+        stripePaymentMethodId: pm.id,
+        stripeCustomerId: stripeCustomerId,
+        type: pm.type,
+        isActive: true,
+      };
+
+      const pmData =
+        pm.type === "card" && pm.card
+          ? {
+              ...baseData,
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              expMonth: pm.card.exp_month,
+              expYear: pm.card.exp_year,
+              funding: pm.card.funding || null,
+              country: pm.card.country || null,
+            }
+          : baseData;
+
+      const isDefault =
+        typeof defaultPaymentMethodId === "string"
+          ? defaultPaymentMethodId === pm.id
+          : defaultPaymentMethodId?.id === pm.id;
+
+      // If this is default, unset other defaults first
+      if (isDefault) {
+        await db
+          .update(paymentMethods)
+          .set({ isDefault: false })
+          .where(eq(paymentMethods.customerId, customer.id));
+      }
+
+      await db
+        .insert(paymentMethods)
+        .values({ ...pmData, isDefault })
+        .onConflictDoUpdate({
+          target: paymentMethods.stripePaymentMethodId,
+          set: { ...pmData, isDefault, updatedAt: new Date() },
+        });
+
+      syncedPaymentMethods++;
+    }
+
+    // Sync invoices
+    const invoicesList = await stripe.invoices.list({
+      customer: stripeCustomerId,
+      limit: 100,
+    });
+
+    for (const invoice of invoicesList.data) {
+      // Find subscription if exists
+      let subscriptionId: string | null = null;
+      if (invoice.subscription) {
+        const subId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription.id;
+        const [sub] = await db
+          .select()
+          .from(subscriptions)
+          .where(eq(subscriptions.stripeSubscriptionId, subId))
+          .limit(1);
+        subscriptionId = sub?.id || null;
+      }
+
+      await db
+        .insert(invoices)
+        .values({
+          customerId: customer.id,
+          subscriptionId,
+          stripeInvoiceId: invoice.id,
+          stripeCustomerId: stripeCustomerId,
+          stripeSubscriptionId:
+            typeof invoice.subscription === "string"
+              ? invoice.subscription
+              : invoice.subscription?.id || null,
+          number: invoice.number || null,
+          status: invoice.status || "open",
+          subtotal: invoice.subtotal || 0,
+          tax: invoice.tax || 0,
+          total: invoice.total || 0,
+          amountDue: invoice.amount_due || 0,
+          amountPaid: invoice.amount_paid || 0,
+          amountRemaining: invoice.amount_remaining || 0,
+          currency: invoice.currency || "usd",
+          hostedInvoiceUrl: invoice.hosted_invoice_url || null,
+          invoicePdf: invoice.invoice_pdf || null,
+          periodStart:
+            invoice.period_start && invoice.period_start > 0
+              ? new Date(invoice.period_start * 1000)
+              : null,
+          periodEnd:
+            invoice.period_end && invoice.period_end > 0
+              ? new Date(invoice.period_end * 1000)
+              : null,
+          dueDate:
+            invoice.due_date && invoice.due_date > 0
+              ? new Date(invoice.due_date * 1000)
+              : null,
+          paidAt:
+            invoice.status === "paid" && invoice.status_transitions?.paid_at
+              ? new Date(invoice.status_transitions.paid_at * 1000)
+              : null,
+          description: invoice.description || null,
+          metadata: (invoice.metadata as Record<string, unknown>) || null,
+        })
+        .onConflictDoUpdate({
+          target: invoices.stripeInvoiceId,
+          set: {
+            status: invoice.status || "open",
+            amountPaid: invoice.amount_paid || 0,
+            amountRemaining: invoice.amount_remaining || 0,
+            paidAt:
+              invoice.status === "paid" && invoice.status_transitions?.paid_at
+                ? new Date(invoice.status_transitions.paid_at * 1000)
+                : null,
+            updatedAt: new Date(),
+          },
+        });
+
+      syncedInvoices++;
+
+      // Create payment record for paid invoices that don't have a payment record yet
+      if (invoice.status === "paid" && invoice.amount_paid > 0) {
+        // Check if payment record already exists for this invoice
+        const paymentIntentId =
+          typeof invoice.payment_intent === "string"
+            ? invoice.payment_intent
+            : invoice.payment_intent?.id || null;
+        
+        const stripePaymentId = paymentIntentId || invoice.id;
+        
+        // Check if payment record exists
+        const [existingPayment] = await db
+          .select()
+          .from(payments)
+          .where(eq(payments.stripePaymentId, stripePaymentId))
+          .limit(1);
+
+        if (!existingPayment && subscriptionId) {
+          try {
+            // Create payment record from invoice
+            await createPaymentFromInvoice(
+              customer.id,
+              subscriptionId,
+              {
+                id: invoice.id,
+                amount_paid: invoice.amount_paid,
+                amount_due: invoice.amount_due || 0,
+                currency: invoice.currency,
+                payment_intent: stripePaymentId,
+                hosted_invoice_url: invoice.hosted_invoice_url || null,
+                period_start: invoice.period_start,
+                period_end: invoice.period_end,
+              },
+              "completed"
+            );
+            syncedPayments++;
+            console.log(
+              `✅ Created payment record for invoice ${invoice.id} (backfill)`
+            );
+          } catch (error) {
+            console.warn(
+              `Failed to create payment record for invoice ${invoice.id}:`,
+              error
+            );
+          }
+        }
+      }
+    }
+
+    return successResponse({
+      message: "Sync completed successfully",
+      syncedPaymentMethods,
+      syncedInvoices,
+      syncedPayments,
+    });
+  } catch (error) {
+    console.error("Failed to sync Stripe data:", error);
+    return handleApiError(error, "Failed to sync Stripe data");
+  }
+}
+

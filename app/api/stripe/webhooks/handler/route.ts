@@ -18,10 +18,16 @@ import {
   handlePaymentFailed,
   handleCustomerUpdated,
   handleCustomerDeleted,
+  handlePaymentMethodAttached,
+  handlePaymentMethodDetached,
+  handleInvoiceCreatedOrUpdated,
+  handleInvoicePaid,
+  handleInvoicePaymentFailed,
   type CheckoutSessionData,
   type StripeSubscriptionData,
   type StripeInvoiceData,
   type StripeCustomerData,
+  type StripePaymentMethodData,
 } from "@/lib/stripe/webhook-handlers";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -117,6 +123,37 @@ export async function POST(request: NextRequest) {
       case "customer.deleted": {
         const customer = event.data.object as StripeCustomerData;
         await handleCustomerDeleted(customer);
+        break;
+      }
+
+      case "payment_method.attached": {
+        const paymentMethod = event.data.object as StripePaymentMethodData;
+        await handlePaymentMethodAttached(paymentMethod);
+        break;
+      }
+
+      case "payment_method.detached": {
+        const paymentMethod = event.data.object as StripePaymentMethodData;
+        await handlePaymentMethodDetached(paymentMethod);
+        break;
+      }
+
+      case "invoice.created":
+      case "invoice.updated": {
+        const invoice = event.data.object as unknown as StripeInvoiceData;
+        await handleInvoiceCreatedOrUpdated(invoice);
+        break;
+      }
+
+      case "invoice.paid": {
+        const invoice = event.data.object as unknown as StripeInvoiceData;
+        await handleInvoicePaid(invoice);
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as unknown as StripeInvoiceData;
+        await handleInvoicePaymentFailed(invoice);
         break;
       }
 

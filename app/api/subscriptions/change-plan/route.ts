@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
 import { db } from "@/lib/db";
-import { subscriptions, licenseKeys, subscriptionChanges } from "@/lib/db/schema";
+import {
+  subscriptions,
+  licenseKeys,
+  subscriptionChanges,
+  activations,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getStripePriceId,
@@ -17,7 +22,17 @@ import {
   handleApiError,
   ValidationError,
 } from "@/lib/api/response-helpers";
-import { isValidPlanId, isUpgrade as checkIsUpgrade } from "@/lib/stripe/plan-utils";
+import {
+  isValidPlanId,
+  isUpgrade as checkIsUpgrade,
+} from "@/lib/stripe/plan-utils";
+import { generateLicenseKey } from "@/lib/license/generator";
+import { getPlanFeatures } from "@/lib/license/validator";
+import {
+  publishLicenseRevoked,
+  publishPlanChanged,
+  getLicenseKeysForSubscription,
+} from "@/lib/subscription-events";
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,6 +72,16 @@ export async function POST(request: NextRequest) {
       throw new ValidationError("Subscription not found");
     }
 
+    // Check if subscription is in trial period
+    const isInTrial = currentSub.trialEnd && new Date(currentSub.trialEnd) > new Date();
+    
+    // Limit plan changes during trial (max 4 changes)
+    if (isInTrial && (currentSub.trialPlanChanges || 0) >= 4) {
+      throw new ValidationError(
+        "You have reached the maximum number of plan changes (4) during your trial period. Please wait until your trial ends or contact support."
+      );
+    }
+
     // Determine billing cycle (use existing if not provided)
     const billingCycle =
       newBillingCycle || (currentSub.billingCycle as BillingCycle);
@@ -91,12 +116,41 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Proration is handled automatically by Stripe
-    // We just set placeholders for the payment record
-    const prorationAmount = 0;
-    const currency = "USD";
-    const stripePaymentId: string | null = null;
-    const invoiceUrl: string | null = null;
+    // Retrieve actual proration details from upcoming invoice
+    let prorationAmount = 0;
+    let currency = "USD";
+    let stripePaymentId: string | null = null;
+    let invoiceUrl: string | null = null;
+
+    try {
+      const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+        customer: currentSub.stripeCustomerId!,
+        subscription: currentSub.stripeSubscriptionId,
+      });
+
+      // Calculate proration from invoice lines
+      const prorationLines = upcomingInvoice.lines.data.filter(
+        (line) => line.proration
+      );
+
+      const prorationAmountCents = prorationLines.reduce(
+        (sum, line) => sum + line.amount,
+        0
+      );
+
+      prorationAmount = prorationAmountCents / 100; // Convert cents to dollars
+      currency = upcomingInvoice.currency.toUpperCase();
+
+      // Check if there's an immediate invoice for the proration
+      if (upcomingInvoice.id && upcomingInvoice.id !== "upcoming") {
+        stripePaymentId = upcomingInvoice.payment_intent as string | null;
+        invoiceUrl = upcomingInvoice.hosted_invoice_url;
+      }
+    } catch (prorationError) {
+      // If we can't retrieve the upcoming invoice, log but continue
+      // The subscription update was successful, so we don't want to fail
+      console.error("Could not retrieve proration details:", prorationError);
+    }
 
     // Determine if this is an upgrade or downgrade
     const isUpgradeChange =
@@ -105,21 +159,34 @@ export async function POST(request: NextRequest) {
         : newPrice > parseFloat(currentSub.price || "0");
     const changeType = isUpgradeChange ? "plan_upgrade" : "plan_downgrade";
 
+    // Get all old license keys before transaction (for SSE events)
+    const oldLicenseKeysList = await getLicenseKeysForSubscription(
+      subscriptionId
+    );
+
     // Update database in a transaction
+    let newLicenseKey: string | null = null;
     await db.transaction(async (tx) => {
-      // Update subscription
+      // Update subscription and increment trial plan changes if in trial
+      const updateData: any = {
+        planId: newPlanId,
+        billingCycle,
+        price: newPrice.toString(),
+        updatedAt: new Date(),
+        metadata: {
+          ...(currentSub.metadata || {}),
+          stripePriceId: newPriceId,
+        },
+      };
+
+      // Increment trial plan changes counter if in trial
+      if (isInTrial) {
+        updateData.trialPlanChanges = (currentSub.trialPlanChanges || 0) + 1;
+      }
+
       await tx
         .update(subscriptions)
-        .set({
-          planId: newPlanId,
-          billingCycle,
-          price: newPrice.toString(),
-          updatedAt: new Date(),
-          metadata: {
-            ...(currentSub.metadata || {}),
-            stripePriceId: newPriceId,
-          },
-        })
+        .set(updateData)
         .where(eq(subscriptions.id, subscriptionId));
 
       // Record change
@@ -139,16 +206,63 @@ export async function POST(request: NextRequest) {
         metadata: {
           changedBy: session.user.id,
           stripeSubscriptionId: currentSub.stripeSubscriptionId,
+          oldLicenseKeys: oldLicenseKeysList,
         },
       });
 
-      // Update license key limits
+      // ⚠️ CRITICAL: Revoke all old license keys and generate new one
+      // During trial: Auto-migrate activations for seamless UX
+      // After trial: Force reactivation (old behavior)
+      
+      // Get existing activations before revoking licenses
+      const existingActivations = isInTrial
+        ? await tx
+            .select()
+            .from(activations)
+            .where(eq(activations.subscriptionId, subscriptionId))
+        : [];
+
       await tx
         .update(licenseKeys)
         .set({
-          maxTerminals: newPlan.features.maxTerminals,
+          isActive: false,
+          revokedAt: new Date(),
+          revocationReason: isInTrial
+            ? `Plan changed from ${currentSub.planId} to ${newPlanId} - activations auto-migrated`
+            : `Plan changed from ${currentSub.planId} to ${newPlanId} - new license key required`,
         })
         .where(eq(licenseKeys.subscriptionId, subscriptionId));
+
+      // Generate new license key for the new plan
+      newLicenseKey = generateLicenseKey(newPlanId, customer.id);
+
+      // Create new license key
+      const [insertedLicense] = await tx.insert(licenseKeys).values({
+        customerId: customer.id,
+        subscriptionId,
+        licenseKey: newLicenseKey,
+        maxTerminals: newPlan.features.maxTerminals,
+        activationCount: existingActivations.length,
+        isActive: true,
+        issuedAt: new Date(),
+        expiresAt: null, // Subscription-based, no expiry
+      }).returning();
+
+      // Auto-migrate activations during trial period
+      if (isInTrial && existingActivations.length > 0) {
+        console.log(`[Trial Migration] Auto-migrating ${existingActivations.length} activation(s) to new license`);
+        
+        // Update all activations to point to the new license key
+        for (const activation of existingActivations) {
+          await tx
+            .update(activations)
+            .set({
+              licenseKeyId: insertedLicense.id,
+              updatedAt: new Date(),
+            })
+            .where(eq(activations.id, activation.id));
+        }
+      }
 
       // Create proration payment record (if applicable and positive)
       // Uses transaction for atomicity
@@ -165,17 +279,51 @@ export async function POST(request: NextRequest) {
       );
     });
 
+    // 🔔 SSE: Notify desktop apps about plan change and license revocation
+    // Send events to all old license keys
+    console.log(
+      `[Plan Change] Sending SSE events to ${oldLicenseKeysList.length} license key(s)`,
+      {
+        oldKeys: oldLicenseKeysList,
+        newLicenseKey,
+        planChange: `${currentSub.planId} → ${newPlanId}`,
+      }
+    );
+
+    for (const oldKey of oldLicenseKeysList) {
+      console.log(`[Plan Change] Publishing license_revoked to ${oldKey}`);
+      // First, notify about license revocation
+      publishLicenseRevoked(oldKey, {
+        reason: `Plan changed from ${currentSub.planId} to ${newPlanId}. Please reactivate with your new license key: ${newLicenseKey}`,
+      });
+
+      console.log(`[Plan Change] Publishing plan_changed to ${oldKey}`);
+      // Then, send plan change event for UI updates
+      publishPlanChanged(oldKey, {
+        previousPlanId: currentSub.planId || "basic",
+        newPlanId,
+        newFeatures: getPlanFeatures(newPlanId),
+        effectiveAt: new Date(),
+      });
+    }
+
+    console.log("[Plan Change] SSE events published successfully");
+
     return successResponse({
       success: true,
-      message: `Successfully ${isUpgradeChange ? "upgraded" : "downgraded"} to ${
+      message: `Successfully ${
+        isUpgradeChange ? "upgraded" : "downgraded"
+      } to ${
         newPlan.name
-      } plan`,
+      } plan. A new license key has been generated. Please reactivate your desktop app.`,
       subscription: {
         planId: newPlanId,
         billingCycle,
         price: newPrice,
         prorationAmount,
       },
+      newLicenseKey,
+      requiresReactivation: true,
     });
   } catch (error) {
     return handleApiError(error, "Failed to change plan");

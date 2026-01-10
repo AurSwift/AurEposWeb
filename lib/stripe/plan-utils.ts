@@ -208,3 +208,137 @@ export function calculateAnnualDiscountPercent(plan: {
   if (monthlyTotal === 0) return 0;
   return Math.round(((monthlyTotal - plan.priceAnnual) / monthlyTotal) * 100);
 }
+
+// ============================================================================
+// STRIPE PRICE ID MAPPING
+// ============================================================================
+
+/**
+ * Map of Stripe Price IDs to Plan IDs
+ * Built from environment variables
+ */
+let PRICE_TO_PLAN_MAP: Record<string, PlanId> | null = null;
+
+/**
+ * Initialize the price-to-plan mapping from environment variables
+ * Called lazily on first use
+ */
+function initializePriceMapping(): void {
+  if (PRICE_TO_PLAN_MAP !== null) {
+    return; // Already initialized
+  }
+
+  PRICE_TO_PLAN_MAP = {};
+
+  // Basic plan
+  if (process.env.STRIPE_PRICE_ID_BASIC_MONTHLY) {
+    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_BASIC_MONTHLY] = "basic";
+  }
+  if (process.env.STRIPE_PRICE_ID_BASIC_ANNUAL) {
+    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_BASIC_ANNUAL] = "basic";
+  }
+
+  // Professional plan
+  if (process.env.STRIPE_PRICE_ID_PRO_MONTHLY) {
+    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_PRO_MONTHLY] = "professional";
+  }
+  if (process.env.STRIPE_PRICE_ID_PRO_ANNUAL) {
+    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_PRO_ANNUAL] = "professional";
+  }
+
+  // Enterprise plan
+  if (process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY) {
+    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY] =
+      "enterprise";
+  }
+  if (process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL) {
+    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL] =
+      "enterprise";
+  }
+}
+
+/**
+ * Get plan ID from a Stripe Price ID
+ *
+ * @param priceId - Stripe Price ID (e.g., "price_1...")
+ * @returns Plan ID ("basic", "professional", or "enterprise")
+ * @throws Error if price ID is not found
+ *
+ * @example
+ * const planId = getPlanIdFromPriceId("price_1SifavHKhBqmsQOULaZbMJch");
+ * // Returns: "basic"
+ */
+export function getPlanIdFromPriceId(priceId: string): PlanId {
+  initializePriceMapping();
+
+  const planId = PRICE_TO_PLAN_MAP![priceId];
+
+  if (!planId) {
+    console.error(
+      `Unknown Stripe Price ID: ${priceId}. Known prices:`,
+      Object.keys(PRICE_TO_PLAN_MAP!)
+    );
+    throw new Error(`Cannot map Stripe Price ID to Plan: ${priceId}`);
+  }
+
+  return planId;
+}
+
+/**
+ * Get plan ID from a Stripe Price ID (safe version)
+ *
+ * @param priceId - Stripe Price ID
+ * @returns Plan ID or null if not found
+ *
+ * @example
+ * const planId = getPlanIdFromPriceIdSafe("unknown_price_id");
+ * // Returns: null
+ */
+export function getPlanIdFromPriceIdSafe(priceId: string): PlanId | null {
+  try {
+    return getPlanIdFromPriceId(priceId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a Stripe Price ID is valid and recognized
+ *
+ * @param priceId - Stripe Price ID to check
+ * @returns true if the price ID maps to a known plan
+ */
+export function isValidPriceId(priceId: string): boolean {
+  initializePriceMapping();
+  return priceId in PRICE_TO_PLAN_MAP!;
+}
+
+/**
+ * Get billing cycle from a Stripe Price ID
+ *
+ * @param priceId - Stripe Price ID
+ * @returns "monthly" or "annual" or null if unknown
+ */
+export function getBillingCycleFromPriceId(
+  priceId: string
+): "monthly" | "annual" | null {
+  // Check monthly prices
+  if (
+    priceId === process.env.STRIPE_PRICE_ID_BASIC_MONTHLY ||
+    priceId === process.env.STRIPE_PRICE_ID_PRO_MONTHLY ||
+    priceId === process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY
+  ) {
+    return "monthly";
+  }
+
+  // Check annual prices
+  if (
+    priceId === process.env.STRIPE_PRICE_ID_BASIC_ANNUAL ||
+    priceId === process.env.STRIPE_PRICE_ID_PRO_ANNUAL ||
+    priceId === process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL
+  ) {
+    return "annual";
+  }
+
+  return null;
+}

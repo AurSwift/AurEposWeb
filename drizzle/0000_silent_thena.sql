@@ -42,6 +42,24 @@ CREATE TABLE "customers" (
 	CONSTRAINT "customers_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
+CREATE TABLE "dead_letter_queue" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"event_id" varchar(100) NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"event_type" varchar(50) NOT NULL,
+	"payload" jsonb NOT NULL,
+	"original_created_at" timestamp with time zone NOT NULL,
+	"failed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"retry_count" integer DEFAULT 0 NOT NULL,
+	"last_error_message" text,
+	"last_error_at" timestamp with time zone,
+	"status" varchar(20) DEFAULT 'pending_review' NOT NULL,
+	"resolution_notes" text,
+	"resolved_by" uuid,
+	"resolved_at" timestamp with time zone,
+	CONSTRAINT "dead_letter_queue_event_id_unique" UNIQUE("event_id")
+);
+--> statement-breakpoint
 CREATE TABLE "employees" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -54,6 +72,106 @@ CREATE TABLE "employees" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "employees_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
+CREATE TABLE "event_acknowledgments" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"event_id" varchar(100) NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"machine_id_hash" varchar(128),
+	"acknowledged_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"status" varchar(20) DEFAULT 'success' NOT NULL,
+	"error_message" text,
+	"processing_time_ms" integer
+);
+--> statement-breakpoint
+CREATE TABLE "event_retry_history" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"event_id" varchar(100) NOT NULL,
+	"attempt_number" integer NOT NULL,
+	"attempted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"result" varchar(20) NOT NULL,
+	"error_message" text,
+	"next_retry_at" timestamp with time zone,
+	"backoff_delay_ms" integer
+);
+--> statement-breakpoint
+CREATE TABLE "failure_patterns" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"pattern_id" varchar(100) NOT NULL,
+	"license_key" varchar(100),
+	"pattern_type" varchar(50) NOT NULL,
+	"description" text NOT NULL,
+	"severity" varchar(20) NOT NULL,
+	"occurrence_count" integer DEFAULT 1 NOT NULL,
+	"first_detected_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_detected_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"metadata" jsonb,
+	"status" varchar(20) DEFAULT 'active' NOT NULL,
+	"resolution_notes" text
+);
+--> statement-breakpoint
+CREATE TABLE "invoice_line_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"invoice_id" uuid NOT NULL,
+	"description" text NOT NULL,
+	"quantity" integer DEFAULT 1 NOT NULL,
+	"unit_amount" integer NOT NULL,
+	"amount" integer NOT NULL,
+	"currency" varchar(3) DEFAULT 'usd' NOT NULL,
+	"stripe_line_item_id" varchar(100),
+	"stripe_price_id" varchar(100),
+	"period_start" timestamp with time zone,
+	"period_end" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "invoices" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"customer_id" uuid NOT NULL,
+	"subscription_id" uuid,
+	"stripe_invoice_id" varchar(100) NOT NULL,
+	"stripe_customer_id" varchar(100) NOT NULL,
+	"stripe_subscription_id" varchar(100),
+	"number" varchar(50),
+	"status" varchar(20) NOT NULL,
+	"subtotal" integer NOT NULL,
+	"tax" integer DEFAULT 0,
+	"total" integer NOT NULL,
+	"amount_due" integer NOT NULL,
+	"amount_paid" integer DEFAULT 0,
+	"amount_remaining" integer DEFAULT 0,
+	"currency" varchar(3) DEFAULT 'usd' NOT NULL,
+	"hosted_invoice_url" text,
+	"invoice_pdf" text,
+	"period_start" timestamp with time zone,
+	"period_end" timestamp with time zone,
+	"due_date" timestamp with time zone,
+	"paid_at" timestamp with time zone,
+	"description" text,
+	"metadata" jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "invoices_stripe_invoice_id_unique" UNIQUE("stripe_invoice_id")
+);
+--> statement-breakpoint
+CREATE TABLE "license_health_metrics" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"health_score" integer DEFAULT 100 NOT NULL,
+	"event_success_rate" numeric(5, 2) DEFAULT '100.00' NOT NULL,
+	"avg_processing_time_ms" integer,
+	"total_events_processed" integer DEFAULT 0 NOT NULL,
+	"total_failures" integer DEFAULT 0 NOT NULL,
+	"total_retries" integer DEFAULT 0 NOT NULL,
+	"total_dlq_events" integer DEFAULT 0 NOT NULL,
+	"last_event_at" timestamp with time zone,
+	"last_failure_at" timestamp with time zone,
+	"health_status" varchar(20) DEFAULT 'healthy' NOT NULL,
+	"failure_patterns" jsonb,
+	"performance_trend" varchar(20) DEFAULT 'stable',
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "license_health_metrics_license_key_unique" UNIQUE("license_key")
 );
 --> statement-breakpoint
 CREATE TABLE "license_keys" (
@@ -84,6 +202,25 @@ CREATE TABLE "password_reset_tokens" (
 	CONSTRAINT "password_reset_tokens_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
+CREATE TABLE "payment_methods" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"customer_id" uuid NOT NULL,
+	"stripe_payment_method_id" varchar(100) NOT NULL,
+	"stripe_customer_id" varchar(100) NOT NULL,
+	"type" varchar(20) NOT NULL,
+	"brand" varchar(20),
+	"last4" varchar(4),
+	"exp_month" integer,
+	"exp_year" integer,
+	"funding" varchar(20),
+	"country" varchar(2),
+	"is_default" boolean DEFAULT false NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "payment_methods_stripe_payment_method_id_unique" UNIQUE("stripe_payment_method_id")
+);
+--> statement-breakpoint
 CREATE TABLE "payments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -98,6 +235,21 @@ CREATE TABLE "payments" (
 	"billing_period_end" timestamp with time zone,
 	"paid_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "performance_metrics" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"license_key" varchar(100),
+	"timestamp" timestamp with time zone NOT NULL,
+	"events_processed" integer DEFAULT 0 NOT NULL,
+	"successful_events" integer DEFAULT 0 NOT NULL,
+	"failed_events" integer DEFAULT 0 NOT NULL,
+	"avg_processing_time_ms" integer,
+	"min_processing_time_ms" integer,
+	"max_processing_time_ms" integer,
+	"p95_processing_time_ms" integer,
+	"events_retried" integer DEFAULT 0 NOT NULL,
+	"events_to_dlq" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "permissions" (
@@ -143,6 +295,17 @@ CREATE TABLE "subscription_changes" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "subscription_events" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"event_id" varchar(100) NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"event_type" varchar(50) NOT NULL,
+	"payload" jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "subscription_events_event_id_unique" UNIQUE("event_id")
+);
+--> statement-breakpoint
 CREATE TABLE "subscriptions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -180,6 +343,49 @@ CREATE TABLE "support_tickets" (
 	"responded_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "terminal_coordination_events" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"event_type" varchar(50) NOT NULL,
+	"machine_id_hash" varchar(64),
+	"payload" jsonb NOT NULL,
+	"occurred_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"is_broadcast" boolean DEFAULT false NOT NULL,
+	"delivery_status" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "terminal_sessions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"machine_id_hash" varchar(64) NOT NULL,
+	"terminal_name" varchar(100),
+	"hostname" varchar(255),
+	"ip_address" varchar(45),
+	"app_version" varchar(50),
+	"connection_status" varchar(20) DEFAULT 'connected' NOT NULL,
+	"first_connected_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_connected_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_heartbeat_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"disconnected_at" timestamp with time zone,
+	"deactivated_at" timestamp with time zone,
+	"is_primary" boolean DEFAULT false NOT NULL,
+	"metadata" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "terminal_state_sync" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"license_key" varchar(100) NOT NULL,
+	"sync_type" varchar(50) NOT NULL,
+	"source_machine_id_hash" varchar(64),
+	"target_machine_id_hashes" jsonb,
+	"payload" jsonb NOT NULL,
+	"sync_status" varchar(20) DEFAULT 'pending' NOT NULL,
+	"initiated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"completed_at" timestamp with time zone,
+	"acknowledged_by" jsonb,
+	"error_message" text
 );
 --> statement-breakpoint
 CREATE TABLE "user_permissions" (
@@ -227,8 +433,12 @@ ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_users_id_fk" FOREIGN KEY
 ALTER TABLE "activations" ADD CONSTRAINT "activations_license_key_license_keys_license_key_fk" FOREIGN KEY ("license_key") REFERENCES "public"."license_keys"("license_key") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "customers" ADD CONSTRAINT "customers_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "employees" ADD CONSTRAINT "employees_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoice_line_items" ADD CONSTRAINT "invoice_line_items_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_subscription_id_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscriptions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "license_keys" ADD CONSTRAINT "license_keys_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "license_keys" ADD CONSTRAINT "license_keys_subscription_id_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscriptions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "payment_methods" ADD CONSTRAINT "payment_methods_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_subscription_id_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscriptions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_id_permissions_id_fk" FOREIGN KEY ("permission_id") REFERENCES "public"."permissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -247,18 +457,42 @@ CREATE INDEX "activations_last_heartbeat_idx" ON "activations" USING btree ("las
 CREATE INDEX "customers_user_id_idx" ON "customers" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "customers_stripe_customer_id_idx" ON "customers" USING btree ("stripe_customer_id");--> statement-breakpoint
 CREATE INDEX "customers_status_idx" ON "customers" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "dead_letter_queue_license_key_idx" ON "dead_letter_queue" USING btree ("license_key");--> statement-breakpoint
+CREATE INDEX "dead_letter_queue_status_idx" ON "dead_letter_queue" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "dead_letter_queue_failed_at_idx" ON "dead_letter_queue" USING btree ("failed_at");--> statement-breakpoint
 CREATE INDEX "employees_user_id_idx" ON "employees" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "employees_department_idx" ON "employees" USING btree ("department");--> statement-breakpoint
 CREATE INDEX "employees_is_active_idx" ON "employees" USING btree ("is_active");--> statement-breakpoint
+CREATE INDEX "event_acknowledgments_event_machine_idx" ON "event_acknowledgments" USING btree ("event_id","machine_id_hash");--> statement-breakpoint
+CREATE INDEX "event_acknowledgments_license_key_idx" ON "event_acknowledgments" USING btree ("license_key");--> statement-breakpoint
+CREATE INDEX "event_acknowledgments_acknowledged_at_idx" ON "event_acknowledgments" USING btree ("acknowledged_at");--> statement-breakpoint
+CREATE INDEX "event_retry_history_event_id_idx" ON "event_retry_history" USING btree ("event_id");--> statement-breakpoint
+CREATE INDEX "event_retry_history_next_retry_at_idx" ON "event_retry_history" USING btree ("next_retry_at");--> statement-breakpoint
+CREATE INDEX "failure_patterns_license_key_idx" ON "failure_patterns" USING btree ("license_key");--> statement-breakpoint
+CREATE INDEX "failure_patterns_pattern_type_idx" ON "failure_patterns" USING btree ("pattern_type");--> statement-breakpoint
+CREATE INDEX "failure_patterns_severity_idx" ON "failure_patterns" USING btree ("severity");--> statement-breakpoint
+CREATE INDEX "failure_patterns_status_idx" ON "failure_patterns" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "invoice_line_items_invoice_id_idx" ON "invoice_line_items" USING btree ("invoice_id");--> statement-breakpoint
+CREATE INDEX "invoices_customer_id_idx" ON "invoices" USING btree ("customer_id");--> statement-breakpoint
+CREATE INDEX "invoices_stripe_invoice_id_idx" ON "invoices" USING btree ("stripe_invoice_id");--> statement-breakpoint
+CREATE INDEX "invoices_status_idx" ON "invoices" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "license_health_metrics_health_status_idx" ON "license_health_metrics" USING btree ("health_status");--> statement-breakpoint
+CREATE INDEX "license_health_metrics_health_score_idx" ON "license_health_metrics" USING btree ("health_score");--> statement-breakpoint
+CREATE INDEX "license_health_metrics_last_event_at_idx" ON "license_health_metrics" USING btree ("last_event_at");--> statement-breakpoint
 CREATE INDEX "license_keys_customer_id_idx" ON "license_keys" USING btree ("customer_id");--> statement-breakpoint
 CREATE INDEX "license_keys_subscription_id_idx" ON "license_keys" USING btree ("subscription_id");--> statement-breakpoint
 CREATE INDEX "license_keys_is_active_idx" ON "license_keys" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX "license_keys_expires_at_idx" ON "license_keys" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "payment_methods_customer_id_idx" ON "payment_methods" USING btree ("customer_id");--> statement-breakpoint
+CREATE INDEX "payment_methods_stripe_pm_id_idx" ON "payment_methods" USING btree ("stripe_payment_method_id");--> statement-breakpoint
+CREATE INDEX "payment_methods_is_default_idx" ON "payment_methods" USING btree ("is_default");--> statement-breakpoint
 CREATE INDEX "payments_customer_id_idx" ON "payments" USING btree ("customer_id");--> statement-breakpoint
 CREATE INDEX "payments_subscription_id_idx" ON "payments" USING btree ("subscription_id");--> statement-breakpoint
 CREATE INDEX "payments_status_idx" ON "payments" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "payments_created_at_idx" ON "payments" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "payments_stripe_payment_id_idx" ON "payments" USING btree ("stripe_payment_id");--> statement-breakpoint
+CREATE INDEX "performance_metrics_license_timestamp_idx" ON "performance_metrics" USING btree ("license_key","timestamp");--> statement-breakpoint
+CREATE INDEX "performance_metrics_timestamp_idx" ON "performance_metrics" USING btree ("timestamp");--> statement-breakpoint
 CREATE INDEX "permissions_resource_idx" ON "permissions" USING btree ("resource");--> statement-breakpoint
 CREATE INDEX "permissions_name_idx" ON "permissions" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "role_permissions_role_idx" ON "role_permissions" USING btree ("role");--> statement-breakpoint
@@ -268,6 +502,9 @@ CREATE INDEX "subscription_changes_subscription_id_idx" ON "subscription_changes
 CREATE INDEX "subscription_changes_customer_id_idx" ON "subscription_changes" USING btree ("customer_id");--> statement-breakpoint
 CREATE INDEX "subscription_changes_change_type_idx" ON "subscription_changes" USING btree ("change_type");--> statement-breakpoint
 CREATE INDEX "subscription_changes_created_at_idx" ON "subscription_changes" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "subscription_events_license_created_idx" ON "subscription_events" USING btree ("license_key","created_at");--> statement-breakpoint
+CREATE INDEX "subscription_events_expires_at_idx" ON "subscription_events" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "subscription_events_event_type_idx" ON "subscription_events" USING btree ("event_type");--> statement-breakpoint
 CREATE INDEX "subscriptions_customer_id_idx" ON "subscriptions" USING btree ("customer_id");--> statement-breakpoint
 CREATE INDEX "subscriptions_stripe_subscription_id_idx" ON "subscriptions" USING btree ("stripe_subscription_id");--> statement-breakpoint
 CREATE INDEX "subscriptions_status_idx" ON "subscriptions" USING btree ("status");--> statement-breakpoint
@@ -277,6 +514,15 @@ CREATE INDEX "support_tickets_status_idx" ON "support_tickets" USING btree ("sta
 CREATE INDEX "support_tickets_priority_idx" ON "support_tickets" USING btree ("priority");--> statement-breakpoint
 CREATE INDEX "support_tickets_responded_by_idx" ON "support_tickets" USING btree ("responded_by");--> statement-breakpoint
 CREATE INDEX "support_tickets_created_at_idx" ON "support_tickets" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "terminal_coordination_events_license_key_idx" ON "terminal_coordination_events" USING btree ("license_key");--> statement-breakpoint
+CREATE INDEX "terminal_coordination_events_event_type_idx" ON "terminal_coordination_events" USING btree ("event_type");--> statement-breakpoint
+CREATE INDEX "terminal_coordination_events_occurred_at_idx" ON "terminal_coordination_events" USING btree ("occurred_at");--> statement-breakpoint
+CREATE INDEX "terminal_sessions_license_status_idx" ON "terminal_sessions" USING btree ("license_key","connection_status");--> statement-breakpoint
+CREATE INDEX "terminal_sessions_machine_license_idx" ON "terminal_sessions" USING btree ("machine_id_hash","license_key");--> statement-breakpoint
+CREATE INDEX "terminal_sessions_last_heartbeat_idx" ON "terminal_sessions" USING btree ("last_heartbeat_at");--> statement-breakpoint
+CREATE INDEX "terminal_state_sync_license_key_idx" ON "terminal_state_sync" USING btree ("license_key");--> statement-breakpoint
+CREATE INDEX "terminal_state_sync_status_idx" ON "terminal_state_sync" USING btree ("sync_status");--> statement-breakpoint
+CREATE INDEX "terminal_state_sync_initiated_at_idx" ON "terminal_state_sync" USING btree ("initiated_at");--> statement-breakpoint
 CREATE INDEX "user_permissions_user_id_idx" ON "user_permissions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "user_permissions_permission_id_idx" ON "user_permissions" USING btree ("permission_id");--> statement-breakpoint
 CREATE INDEX "user_permissions_expires_at_idx" ON "user_permissions" USING btree ("expires_at");--> statement-breakpoint

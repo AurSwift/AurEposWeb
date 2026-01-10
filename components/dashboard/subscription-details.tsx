@@ -69,7 +69,9 @@ export function SubscriptionDetails({
 
   const handleManageBilling = async () => {
     try {
-      const response = await fetch("/api/stripe/billing/portal", { method: "POST" });
+      const response = await fetch("/api/stripe/billing/portal", {
+        method: "POST",
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -189,7 +191,8 @@ export function SubscriptionDetails({
 
         {/* Trial Period Warning */}
         {subscription.trialEnd &&
-          new Date(subscription.trialEnd) > new Date() && (
+          new Date(subscription.trialEnd) > new Date() &&
+          !subscription.cancelAtPeriodEnd && (
             <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
               <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
               <div className="flex-1">
@@ -204,24 +207,48 @@ export function SubscriptionDetails({
             </div>
           )}
 
-        {/* Cancellation Warning */}
-        {subscription.cancelAtPeriodEnd && (
-          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md">
-            <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">
-                Subscription Cancels Soon
-              </p>
-              <p className="text-xs text-destructive/80">
-                Your subscription will end on{" "}
-                {format(
-                  new Date(subscription.currentPeriodEnd),
-                  "MMM dd, yyyy"
-                )}
-              </p>
+        {/* Trial Cancellation Warning */}
+        {subscription.trialEnd &&
+          new Date(subscription.trialEnd) > new Date() &&
+          subscription.cancelAtPeriodEnd && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                  Trial Cancelled - Access Preserved
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Your trial access continues until{" "}
+                  {format(new Date(subscription.trialEnd), "MMM dd, yyyy")}.
+                  After that, you'll have a 7-day grace period to export your
+                  data.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+        {/* Paid Subscription Cancellation Warning */}
+        {subscription.cancelAtPeriodEnd &&
+          (!subscription.trialEnd ||
+            new Date(subscription.trialEnd) <= new Date()) && (
+            <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-destructive">
+                  Subscription Cancels Soon
+                </p>
+                <p className="text-xs text-destructive/80">
+                  Your subscription will end on{" "}
+                  {format(
+                    new Date(subscription.currentPeriodEnd),
+                    "MMM dd, yyyy"
+                  )}
+                  . You'll have a 7-day grace period after that to export your
+                  data.
+                </p>
+              </div>
+            </div>
+          )}
 
         {/* Billing Info */}
         <div className="space-y-2">

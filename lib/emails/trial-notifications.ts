@@ -21,6 +21,7 @@ interface CancellationData {
   accessEndDate: Date;
   exportDataUrl?: string;
   wasInTrial: boolean;
+  cancelImmediately: boolean;
 }
 
 interface GracePeriodData {
@@ -176,12 +177,22 @@ export async function sendCancellationConfirmationEmail(
   try {
     const transporter = createTransporter();
 
+    // Determine email subject based on scenario
+    let subject: string;
+    if (data.wasInTrial && data.cancelImmediately) {
+      subject = "Trial Cancelled - Access Ended Immediately";
+    } else if (data.wasInTrial && !data.cancelImmediately) {
+      subject = "Trial Cancellation Confirmed - Access Until Trial End";
+    } else if (!data.wasInTrial && data.cancelImmediately) {
+      subject = "Subscription Cancelled - Access Ended Immediately";
+    } else {
+      subject = "Subscription Cancellation Confirmed - Access Until Period End";
+    }
+
     const mailOptions = {
       from: `"AuraSwift EPOS" <${fromEmail}>`,
       to: data.email,
-      subject: data.wasInTrial
-        ? "Trial Cancellation Confirmed - Access Until Trial End"
-        : "Subscription Cancellation Confirmed",
+      subject,
       html: generateCancellationConfirmationTemplate(data),
       text: generateCancellationConfirmationText(data),
     };
@@ -541,34 +552,62 @@ function generateCancellationConfirmationTemplate(
                 ${
                   data.wasInTrial
                     ? "Trial Cancellation Confirmed"
-                    : "Cancellation Confirmed"
+                    : "Subscription Cancellation Confirmed"
                 }
               </h2>
               <p style="margin: 0 0 20px; color: #666; font-size: 16px; line-height: 1.6;">
                 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
               </p>
               <p style="margin: 0 0 20px; color: #666; font-size: 16px; line-height: 1.6;">
-                Your <strong>${
-                  data.planName
-                }</strong> subscription has been cancelled.
+                Your <strong>${data.planName}</strong> ${
+    data.wasInTrial ? "trial" : "subscription"
+  } has been cancelled.
               </p>
               
-              <div style="margin: 30px 0; padding: 20px; background-color: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                <p style="margin: 0 0 10px; color: #0c5460; font-size: 14px; font-weight: bold;">
-                  ${
-                    data.wasInTrial
-                      ? "ℹ️ You still have access until your trial ends"
-                      : "ℹ️ Important Information"
-                  }
-                </p>
-                <p style="margin: 0; color: #0c5460; font-size: 14px; line-height: 1.6;">
-                  ${
-                    data.wasInTrial
-                      ? `You'll retain full access to AuraSwift EPOS until <strong>${data.accessEndDate.toLocaleDateString()}</strong>. No charges will be made.`
-                      : `You'll retain access until <strong>${data.accessEndDate.toLocaleDateString()}</strong>. After that, your license will be deactivated.`
-                  }
-                </p>
-              </div>
+              ${(() => {
+                // Trial + Immediate Cancel
+                if (data.wasInTrial && data.cancelImmediately) {
+                  return `<div style="margin: 30px 0; padding: 20px; background-color: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">
+                    <p style="margin: 0 0 10px; color: #721c24; font-size: 14px; font-weight: bold;">
+                      ⚠️ Access Ended Immediately
+                    </p>
+                    <p style="margin: 0; color: #721c24; font-size: 14px; line-height: 1.6;">
+                      Your trial has been cancelled and access has ended immediately. You have a <strong>7-day grace period</strong> to export your data before it's permanently deleted.
+                    </p>
+                  </div>`;
+                }
+                // Trial + Scheduled Cancel
+                if (data.wasInTrial && !data.cancelImmediately) {
+                  return `<div style="margin: 30px 0; padding: 20px; background-color: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
+                    <p style="margin: 0 0 10px; color: #0c5460; font-size: 14px; font-weight: bold;">
+                      ℹ️ Trial Access Preserved Until Trial End
+                    </p>
+                    <p style="margin: 0; color: #0c5460; font-size: 14px; line-height: 1.6;">
+                      You'll retain full access to AuraSwift EPOS until your trial ends on <strong>${data.accessEndDate.toLocaleDateString()}</strong>. No charges will be made. After your trial ends, you'll have a <strong>7-day grace period</strong> to export your data.
+                    </p>
+                  </div>`;
+                }
+                // Paid + Immediate Cancel
+                if (!data.wasInTrial && data.cancelImmediately) {
+                  return `<div style="margin: 30px 0; padding: 20px; background-color: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">
+                    <p style="margin: 0 0 10px; color: #721c24; font-size: 14px; font-weight: bold;">
+                      ⚠️ Access Ended Immediately
+                    </p>
+                    <p style="margin: 0; color: #721c24; font-size: 14px; line-height: 1.6;">
+                      Your subscription has been cancelled and access has ended immediately. You have a <strong>7-day grace period</strong> to export your data before your license is permanently deactivated.
+                    </p>
+                  </div>`;
+                }
+                // Paid + Scheduled Cancel
+                return `<div style="margin: 30px 0; padding: 20px; background-color: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
+                  <p style="margin: 0 0 10px; color: #0c5460; font-size: 14px; font-weight: bold;">
+                    ℹ️ Access Preserved Until Billing Period End
+                  </p>
+                  <p style="margin: 0; color: #0c5460; font-size: 14px; line-height: 1.6;">
+                    You'll retain full access to AuraSwift EPOS until your billing period ends on <strong>${data.accessEndDate.toLocaleDateString()}</strong>. After that, you'll have a <strong>7-day grace period</strong> to export your data before your license is deactivated.
+                  </p>
+                </div>`;
+              })()}
               
               <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 6px;">
                 <p style="margin: 0 0 15px; color: #333; font-size: 14px; font-weight: bold;">📥 Export Your Data</p>
@@ -838,20 +877,48 @@ function generateCancellationConfirmationText(data: CancellationData): string {
   const exportUrl =
     data.exportDataUrl || `${process.env.NEXTAUTH_URL}/dashboard/export`;
 
-  return `
-AuraSwift EPOS - ${
-    data.wasInTrial ? "Trial Cancellation Confirmed" : "Cancellation Confirmed"
+  // Determine subject
+  let subject: string;
+  if (data.wasInTrial && data.cancelImmediately) {
+    subject = "Trial Cancelled - Access Ended Immediately";
+  } else if (data.wasInTrial && !data.cancelImmediately) {
+    subject = "Trial Cancellation Confirmed - Access Until Trial End";
+  } else if (!data.wasInTrial && data.cancelImmediately) {
+    subject = "Subscription Cancelled - Access Ended Immediately";
+  } else {
+    subject = "Subscription Cancellation Confirmed - Access Until Period End";
   }
+
+  // Determine access message
+  let accessMessage: string;
+  if (data.wasInTrial && data.cancelImmediately) {
+    accessMessage = `⚠️ ACCESS ENDED IMMEDIATELY
+
+Your trial has been cancelled and access has ended immediately. You have a 7-day grace period to export your data before it's permanently deleted.`;
+  } else if (data.wasInTrial && !data.cancelImmediately) {
+    accessMessage = `ℹ️ TRIAL ACCESS PRESERVED UNTIL TRIAL END
+
+You'll retain full access to AuraSwift EPOS until your trial ends on ${data.accessEndDate.toLocaleDateString()}. No charges will be made. After your trial ends, you'll have a 7-day grace period to export your data.`;
+  } else if (!data.wasInTrial && data.cancelImmediately) {
+    accessMessage = `⚠️ ACCESS ENDED IMMEDIATELY
+
+Your subscription has been cancelled and access has ended immediately. You have a 7-day grace period to export your data before your license is permanently deactivated.`;
+  } else {
+    accessMessage = `ℹ️ ACCESS PRESERVED UNTIL BILLING PERIOD END
+
+You'll retain full access to AuraSwift EPOS until your billing period ends on ${data.accessEndDate.toLocaleDateString()}. After that, you'll have a 7-day grace period to export your data before your license is deactivated.`;
+  }
+
+  return `
+AuraSwift EPOS - ${subject}
 
 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
 
-Your ${data.planName} subscription has been cancelled.
+Your ${data.planName} ${
+    data.wasInTrial ? "trial" : "subscription"
+  } has been cancelled.
 
-${
-  data.wasInTrial
-    ? `You still have access until your trial ends on ${data.accessEndDate.toLocaleDateString()}. No charges will be made.`
-    : `You'll retain access until ${data.accessEndDate.toLocaleDateString()}. After that, your license will be deactivated.`
-}
+${accessMessage}
 
 EXPORT YOUR DATA
 Before your access ends, we recommend exporting your transaction history, reports, and customer data.

@@ -68,6 +68,7 @@ export interface SubscriptionUpdatedEvent extends BaseSubscriptionEvent {
     newStatus: string;
     shouldDisable: boolean;
     gracePeriodRemaining: number | null;
+    trialEnd?: string | null; // Trial end date (null when trial ends)
   };
 }
 

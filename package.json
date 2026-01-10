@@ -23,7 +23,11 @@
     "db:drop-tables": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local",
     "db:drop-tables:dry-run": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local --dry-run",
     "admin:create": "tsx --env-file=.env.local scripts/create-admin-user.ts",
-    "webhook:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhooks/handler"
+    "webhook:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhooks/handler",
+    "redis:test": "tsx -r dotenv/config scripts/redis-test.ts dotenv_config_path=.env.local",
+    "redis:monitor": "redis-cli monitor",
+    "redis:info": "redis-cli info",
+    "redis:cli": "redis-cli"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
@@ -64,6 +68,7 @@
     "drizzle-orm": "^0.45.1",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "ioredis": "^5.9.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "next-auth": "^4.24.13",
@@ -85,6 +90,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
+    "@types/ioredis": "^4.28.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

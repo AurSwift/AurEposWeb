@@ -213,10 +213,33 @@ export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
         throw new Error(data.error || "Failed to change plan");
       }
 
-      toast({
-        title: "Success",
-        description: data.message,
-      });
+      // Show success with new license key if provided
+      if (data.newLicenseKey) {
+        toast({
+          title: "Plan Changed Successfully",
+          description: (
+            <div className="space-y-2">
+              <p>{data.message}</p>
+              <div className="mt-2 p-2 bg-secondary rounded">
+                <p className="text-xs font-semibold mb-1">New License Key:</p>
+                <p className="text-sm font-mono break-all">
+                  {data.newLicenseKey}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your desktop app will be automatically deactivated. Please use
+                this new license key to reactivate.
+              </p>
+            </div>
+          ),
+          duration: 10000, // Show for 10 seconds
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+      }
 
       setChangePlanOpen(false);
 
@@ -375,53 +398,72 @@ export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-4 py-4">
-              <RadioGroup
-                value={cancelType}
-                onValueChange={(value) => setCancelType(value as CancelType)}
-              >
-                <Label
-                  htmlFor="end_of_period"
-                  className={`flex items-start space-x-2 p-3 border rounded-md cursor-pointer transition-colors hover:bg-accent/20 ${
-                    cancelType === "end_of_period"
-                      ? "border-primary/30 bg-primary/5"
-                      : ""
-                  }`}
-                >
-                  <RadioGroupItem
-                    value="end_of_period"
-                    id="end_of_period"
-                    className="mt-1"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">
-                      Cancel at end of billing period
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      You'll retain access until your current period ends
-                    </p>
-                  </div>
-                </Label>
-                <Label
-                  htmlFor="immediately"
-                  className={`flex items-start space-x-2 p-3 border rounded-md cursor-pointer transition-colors hover:bg-destructive/5 ${
-                    cancelType === "immediately"
-                      ? "border-destructive/30 bg-destructive/5"
-                      : ""
-                  }`}
-                >
-                  <RadioGroupItem
-                    value="immediately"
-                    id="immediately"
-                    className="mt-1"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">Cancel immediately</div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Access ends now. No refund for remaining time.
-                    </p>
-                  </div>
-                </Label>
-              </RadioGroup>
+              {/* Determine if subscription is in trial */}
+              {(() => {
+                const isInTrial =
+                  subscription?.status === "trialing" &&
+                  subscription?.trialEnd &&
+                  new Date(subscription.trialEnd) > new Date();
+
+                return (
+                  <RadioGroup
+                    value={cancelType}
+                    onValueChange={(value) =>
+                      setCancelType(value as CancelType)
+                    }
+                  >
+                    <Label
+                      htmlFor="end_of_period"
+                      className={`flex items-start space-x-2 p-3 border rounded-md cursor-pointer transition-colors hover:bg-accent/20 ${
+                        cancelType === "end_of_period"
+                          ? "border-primary/30 bg-primary/5"
+                          : ""
+                      }`}
+                    >
+                      <RadioGroupItem
+                        value="end_of_period"
+                        id="end_of_period"
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {isInTrial
+                            ? "Cancel at end of trial period"
+                            : "Cancel at end of billing period"}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {isInTrial
+                            ? "Keep access until your trial ends. You won't be charged."
+                            : "You'll retain access until your current billing period ends"}
+                        </p>
+                      </div>
+                    </Label>
+                    <Label
+                      htmlFor="immediately"
+                      className={`flex items-start space-x-2 p-3 border rounded-md cursor-pointer transition-colors hover:bg-destructive/5 ${
+                        cancelType === "immediately"
+                          ? "border-destructive/30 bg-destructive/5"
+                          : ""
+                      }`}
+                    >
+                      <RadioGroupItem
+                        value="immediately"
+                        id="immediately"
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">Cancel immediately</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {isInTrial
+                            ? "Access ends now. Trial is forfeited."
+                            : "Access ends now. No refund for remaining time."}
+                        </p>
+                      </div>
+                    </Label>
+                  </RadioGroup>
+                );
+              })()}
+
               <div className="space-y-2">
                 <Label htmlFor="reason">
                   Reason for cancellation (optional)

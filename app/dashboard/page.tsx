@@ -6,6 +6,8 @@ import { LicenseKeyCard } from "@/components/license-key-card";
 import { PaymentMethodCard } from "@/components/payment-method-card";
 import { DownloadCard } from "@/components/download-card";
 import { QuickLinksCard } from "@/components/quick-links-card";
+import { InvoiceHistory } from "@/components/invoice-history";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db } from "@/lib/db";
 import { customers, subscriptions, licenseKeys } from "@/lib/db/schema";
 import { eq, desc, and, or } from "drizzle-orm";
@@ -204,16 +206,38 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <SubscriptionCard subscription={subscriptionData} />
-        <LicenseKeyCard licenseKey={licenseKey} />
-        <PaymentMethodCard />
-      </div>
+      <Tabs defaultValue="overview" className="mt-8 space-y-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-[400px]">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="invoices">Invoices</TabsTrigger>
+        </TabsList>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <DownloadCard subscriptionStatus={subscription?.status} />
-        <QuickLinksCard />
-      </div>
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <SubscriptionCard subscription={subscriptionData} />
+            <LicenseKeyCard licenseKey={licenseKey} />
+            <PaymentMethodCard />
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <DownloadCard subscriptionStatus={subscription?.status} />
+            <QuickLinksCard />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="billing" className="space-y-6">
+          <h2 className="text-2xl font-bold">Payment Method</h2>
+          <div className="max-w-md">
+            <PaymentMethodCard />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="invoices" className="space-y-6">
+          <h2 className="text-2xl font-bold">Billing History</h2>
+          <InvoiceHistory />
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

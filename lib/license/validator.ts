@@ -67,6 +67,8 @@ export interface ActivationResult {
     expiresAt: string | null;
     subscriptionStatus: string;
     businessName: string | null;
+    terminalName: string; // The actual terminal name saved to the database
+    trialEnd: string | null; // Trial end date for trial subscriptions
   };
 }
 
@@ -81,6 +83,7 @@ export interface ValidationResult {
     subscriptionStatus: string;
     expiresAt: string | null;
     daysUntilExpiry: number | null;
+    trialEnd: string | null; // Trial end date for trial subscriptions
   };
 }
 
@@ -93,6 +96,8 @@ export interface HeartbeatResult {
     subscriptionStatus: string;
     shouldDisable: boolean;
     gracePeriodRemaining: number | null;
+    trialEnd: string | null; // Trial end date for trial subscriptions
+    heartbeatIntervalMs?: number; // Interval in milliseconds for next heartbeat
   };
 }
 
@@ -296,6 +301,7 @@ export async function activateLicense(
       // Step 5: Check subscription status
       let subscriptionStatus = "active";
       let businessName: string | null = null;
+      let trialEnd: Date | null = null;
       if (license.subscriptionId) {
         const [subscription] = await tx
           .select()
@@ -305,12 +311,10 @@ export async function activateLicense(
 
         if (subscription) {
           subscriptionStatus = subscription.status || "active";
+          trialEnd = subscription.trialEnd;
 
-          // Allow trialing subscriptions
-          if (subscriptionStatus === "trialing") {
-            subscriptionStatus = "active";
-          }
-
+          // Keep "trialing" status so desktop app can show trial information
+          // Only block cancelled and past_due (trialing is allowed)
           if (
             subscriptionStatus === "cancelled" ||
             subscriptionStatus === "past_due"
@@ -379,6 +383,9 @@ export async function activateLicense(
             expiresAt: license.expiresAt?.toISOString() || null,
             subscriptionStatus,
             businessName,
+            terminalName:
+              terminalName || existingMachineActivation.terminalName, // Use updated or existing terminal name
+            trialEnd: trialEnd?.toISOString() || null,
           },
         };
       }
@@ -445,6 +452,8 @@ export async function activateLicense(
           expiresAt: license.expiresAt?.toISOString() || null,
           subscriptionStatus,
           businessName,
+          terminalName: newActivation.terminalName, // Include the actual terminal name saved to DB
+          trialEnd: trialEnd?.toISOString() || null,
         },
       };
     });
@@ -497,12 +506,15 @@ export async function validateLicense(
   if (!license.isActive || license.revokedAt) {
     return {
       success: false,
-      message: `License key has been revoked${license.revocationReason ? `: ${license.revocationReason}` : ""}`,
+      message: `License key has been revoked${
+        license.revocationReason ? `: ${license.revocationReason}` : ""
+      }`,
     };
   }
 
   // Step 4: Check subscription if linked
   let subscriptionStatus = "active";
+  let trialEnd: Date | null = null;
   if (license.subscriptionId) {
     const [subscription] = await db
       .select()
@@ -512,11 +524,8 @@ export async function validateLicense(
 
     if (subscription) {
       subscriptionStatus = subscription.status || "active";
-
-      // Trialing is considered active
-      if (subscriptionStatus === "trialing") {
-        subscriptionStatus = "active";
-      }
+      trialEnd = subscription.trialEnd;
+      // Keep original status (including "trialing") for accurate display
     }
   }
 
@@ -565,6 +574,7 @@ export async function validateLicense(
       subscriptionStatus,
       expiresAt: license.expiresAt?.toISOString() || null,
       daysUntilExpiry,
+      trialEnd: trialEnd?.toISOString() || null,
     },
   };
 }
@@ -611,6 +621,7 @@ export async function processHeartbeat(
         subscriptionStatus: "unknown",
         shouldDisable: true,
         gracePeriodRemaining: null,
+        heartbeatIntervalMs: 15 * 60 * 1000, // Default interval
       },
     };
   }
@@ -632,6 +643,7 @@ export async function processHeartbeat(
         subscriptionStatus: "revoked",
         shouldDisable: true,
         gracePeriodRemaining: null,
+        heartbeatIntervalMs: 15 * 60 * 1000, // Default interval
       },
     };
   }
@@ -639,6 +651,7 @@ export async function processHeartbeat(
   // Check subscription status
   let subscriptionStatus = "active";
   let shouldDisable = false;
+  let trialEnd: Date | null = null;
   let gracePeriodRemaining: number | null =
     OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
@@ -651,6 +664,7 @@ export async function processHeartbeat(
 
     if (subscription) {
       subscriptionStatus = subscription.status || "active";
+      trialEnd = subscription.trialEnd;
       const now = new Date();
 
       // Check if currently in trial period
@@ -746,6 +760,12 @@ export async function processHeartbeat(
 
   const planId = extractPlanFromKey(normalizedKey) || "basic";
 
+  // Determine heartbeat interval based on trial status
+  // Trial period: 2 minutes for faster sync
+  // Active subscription: 15 minutes (default)
+  const isInTrial = subscriptionStatus === "trialing" && trialEnd && new Date(trialEnd) > new Date();
+  const heartbeatIntervalMs = isInTrial ? 2 * 60 * 1000 : 15 * 60 * 1000;
+
   return {
     success: true,
     message: "Heartbeat recorded",
@@ -755,6 +775,8 @@ export async function processHeartbeat(
       subscriptionStatus,
       shouldDisable,
       gracePeriodRemaining,
+      trialEnd: trialEnd?.toISOString() || null,
+      heartbeatIntervalMs,
     },
   };
 }

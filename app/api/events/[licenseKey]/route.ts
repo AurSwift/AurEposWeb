@@ -8,11 +8,17 @@
  * Flow:
  * 1. Desktop connects with license key
  * 2. Server validates license key exists
- * 3. Server subscribes to events for that license
+ * 3. Server subscribes to events via Redis (or in-memory fallback)
  * 4. Events are pushed to desktop in real-time
  * 5. Periodic heartbeats keep connection alive
  *
  * Route: GET /api/events/[licenseKey]
+ *
+ * Redis Pub/Sub Architecture:
+ * - Each SSE connection creates a Redis subscriber for its license key
+ * - Webhook handlers publish events to Redis
+ * - All server instances receive events via Redis subscription
+ * - Events are forwarded to connected clients
  */
 
 import { NextRequest } from "next/server";
@@ -20,11 +26,12 @@ import { db } from "@/lib/db";
 import { licenseKeys, activations } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
-  subscribeToLicense,
   serializeEvent,
   createSubscriptionEvent,
   type SubscriptionEvent,
-} from "@/lib/subscription-events";
+} from "@/lib/subscription-events/types";
+import { subscribeToLicense } from "@/lib/subscription-events/redis-publisher";
+import { isRedisConfigured } from "@/lib/redis";
 
 // SSE heartbeat interval (30 seconds)
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
@@ -128,17 +135,26 @@ export async function GET(
   const { licenseKey } = await params;
   const machineIdHash = request.nextUrl.searchParams.get("machineId");
 
+  console.log("[SSE] New connection request", {
+    licenseKey: licenseKey.substring(0, 15) + "...",
+    machineIdHash: machineIdHash?.substring(0, 20) + "...",
+    fullLicenseKey: licenseKey,
+  });
+
   // Validate license key
   const validation = await validateLicenseKey(
     licenseKey,
     machineIdHash || undefined
   );
   if (!validation.valid) {
+    console.error("[SSE] ❌ Validation failed:", validation.error);
     return new Response(JSON.stringify({ error: validation.error }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  console.log("[SSE] ✅ Validation passed, establishing connection");
 
   const normalizedKey = licenseKey.toUpperCase();
 
@@ -147,11 +163,12 @@ export async function GET(
     .toString(36)
     .substring(2, 9)}`;
 
+  const transport = isRedisConfigured() ? "Redis" : "in-memory";
   console.log(
     `[SSE] Client connected: ${connectionId} for license ${normalizedKey.substring(
       0,
       15
-    )}...`
+    )}... (transport: ${transport})`
   );
 
   // Create readable stream for SSE
