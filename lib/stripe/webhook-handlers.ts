@@ -197,11 +197,15 @@ export async function handleCheckoutCompleted(session: CheckoutSessionData) {
   const PLAN_CODES: Record<string, string> = {
     basic: "BAS",
     professional: "PRO",
-    enterprise: "ENT",
   };
 
   // Use transaction for subscription creation + license management + audit logging
-  const { subscription, licenseKeyValue } = await withTransaction(
+  const { 
+    subscription, 
+    licenseKeyValue, 
+    planTierChanged, 
+    existingPlanCode 
+  } = await withTransaction(
     async (tx) => {
       // Check for existing active subscriptions (prevent duplicates)
       const existingActiveSubscriptions = await tx
@@ -319,7 +323,7 @@ export async function handleCheckoutCompleted(session: CheckoutSessionData) {
         // Generate NEW license if:
         // - No previous license exists
         // - Previous license was revoked
-        // - Plan TIER changed (BAS → PRO, PRO → ENT, etc.)
+        // - Plan TIER changed (BAS → PRO, etc.)
 
         // Deactivate old license if plan tier changed
         if (existingLicense && planTierChanged) {
@@ -386,10 +390,10 @@ export async function handleCheckoutCompleted(session: CheckoutSessionData) {
   // PUBLISH PLAN CHANGE EVENT (SSE)
   // If plan tier changed during checkout, notify desktop apps
   // =========================================================================
-  if (subscription.planTierChanged && subscription.existingPlanCode) {
+  if (planTierChanged && existingPlanCode) {
     const { getPlanIdFromCode } = await import("@/lib/stripe/plan-utils");
 
-    const previousPlanId = getPlanIdFromCode(subscription.existingPlanCode);
+    const previousPlanId = getPlanIdFromCode(existingPlanCode);
     const newPlanId = planId;
 
     if (previousPlanId) {
@@ -399,7 +403,7 @@ export async function handleCheckoutCompleted(session: CheckoutSessionData) {
 
       const { publishPlanChanged } = await import("@/lib/subscription-events");
 
-      publishPlanChanged(subscription.licenseKeyValue, {
+      publishPlanChanged(licenseKeyValue, {
         previousPlanId,
         newPlanId,
         newFeatures: plan.features.features,
@@ -780,7 +784,7 @@ export async function handleSubscriptionUpdated(
         ? "basic"
         : license.licenseKey.includes("-PRO-")
         ? "professional"
-        : "enterprise";
+        : "basic"; // Default to basic if unknown format
 
       publishLicenseReactivated(license.licenseKey, {
         planId,
@@ -791,7 +795,7 @@ export async function handleSubscriptionUpdated(
 
   // 2. Notify about plan change (if price changed)
   const currentPriceId = subscription.items.data[0]?.price.id;
-  const previousPriceId = existingSubscription.metadata?.stripePriceId as
+  const previousPriceId = (existingSubscription.metadata as any)?.stripePriceId as
     | string
     | undefined;
 

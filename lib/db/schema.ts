@@ -1022,7 +1022,8 @@ export const terminalSessions = pgTable(
     // License key for this terminal
     licenseKey: varchar("license_key", { length: 100 }).notNull(),
     // Machine ID hash (unique identifier for this terminal)
-    machineIdHash: varchar("machine_id_hash", { length: 64 }).notNull(),
+    // Format: MF2-{64 char SHA256} = 68 chars minimum, use 128 for safety
+    machineIdHash: varchar("machine_id_hash", { length: 128 }).notNull(),
     // Terminal name/identifier (for display)
     terminalName: varchar("terminal_name", { length: 100 }),
     // Machine hostname
@@ -1133,8 +1134,8 @@ export const terminalCoordinationEvents = pgTable(
     licenseKey: varchar("license_key", { length: 100 }).notNull(),
     // Event type: terminal_added, terminal_removed, primary_changed, deactivation_broadcast
     eventType: varchar("event_type", { length: 50 }).notNull(),
-    // Affected terminal
-    machineIdHash: varchar("machine_id_hash", { length: 64 }),
+    // Affected terminal (MF2- prefix + 64 char SHA256 = 68 chars, use 128 for safety)
+    machineIdHash: varchar("machine_id_hash", { length: 128 }),
     // Event payload
     payload: jsonb("payload").notNull(),
     // When the event occurred

@@ -12,7 +12,6 @@ import type { PlanId } from "@/lib/stripe/plans";
 export const PLAN_CODES: Record<PlanId, string> = {
   basic: "BAS",
   professional: "PRO",
-  enterprise: "ENT",
 } as const;
 
 /**
@@ -22,7 +21,6 @@ export const PLAN_CODES: Record<PlanId, string> = {
 export const CODE_TO_PLAN: Record<string, PlanId> = {
   BAS: "basic",
   PRO: "professional",
-  ENT: "enterprise",
 } as const;
 
 /**

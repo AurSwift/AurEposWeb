@@ -7,7 +7,6 @@ import type { PlanId } from "./plans";
 const PLAN_DISPLAY_NAMES: Record<PlanId, string> = {
   basic: "Basic Plan",
   professional: "Professional Plan",
-  enterprise: "Enterprise Plan",
 } as const;
 
 /**
@@ -16,7 +15,6 @@ const PLAN_DISPLAY_NAMES: Record<PlanId, string> = {
 const PLAN_SHORT_NAMES: Record<PlanId, string> = {
   basic: "Basic",
   professional: "Pro",
-  enterprise: "Enterprise",
 } as const;
 
 /**
@@ -25,7 +23,6 @@ const PLAN_SHORT_NAMES: Record<PlanId, string> = {
 export const PLAN_CODES: Record<PlanId, string> = {
   basic: "BAS",
   professional: "PRO",
-  enterprise: "ENT",
 } as const;
 
 /**
@@ -34,7 +31,6 @@ export const PLAN_CODES: Record<PlanId, string> = {
 export const CODE_TO_PLAN: Record<string, PlanId> = {
   BAS: "basic",
   PRO: "professional",
-  ENT: "enterprise",
 } as const;
 
 /**
@@ -115,7 +111,7 @@ export function capitalizePlanId(planId: string): string {
 export function isValidPlanId(id: unknown): id is PlanId {
   return (
     typeof id === "string" &&
-    ["basic", "professional", "enterprise"].includes(id)
+    ["basic", "professional"].includes(id)
   );
 }
 
@@ -129,7 +125,6 @@ export function getPlanTier(planId: PlanId): number {
   const tiers: Record<PlanId, number> = {
     basic: 1,
     professional: 2,
-    enterprise: 3,
   };
   return tiers[planId];
 }
@@ -245,23 +240,13 @@ function initializePriceMapping(): void {
   if (process.env.STRIPE_PRICE_ID_PRO_ANNUAL) {
     PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_PRO_ANNUAL] = "professional";
   }
-
-  // Enterprise plan
-  if (process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY) {
-    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY] =
-      "enterprise";
-  }
-  if (process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL) {
-    PRICE_TO_PLAN_MAP[process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL] =
-      "enterprise";
-  }
 }
 
 /**
  * Get plan ID from a Stripe Price ID
  *
  * @param priceId - Stripe Price ID (e.g., "price_1...")
- * @returns Plan ID ("basic", "professional", or "enterprise")
+ * @returns Plan ID ("basic" or "professional")
  * @throws Error if price ID is not found
  *
  * @example
@@ -325,8 +310,7 @@ export function getBillingCycleFromPriceId(
   // Check monthly prices
   if (
     priceId === process.env.STRIPE_PRICE_ID_BASIC_MONTHLY ||
-    priceId === process.env.STRIPE_PRICE_ID_PRO_MONTHLY ||
-    priceId === process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY
+    priceId === process.env.STRIPE_PRICE_ID_PRO_MONTHLY
   ) {
     return "monthly";
   }
@@ -334,8 +318,7 @@ export function getBillingCycleFromPriceId(
   // Check annual prices
   if (
     priceId === process.env.STRIPE_PRICE_ID_BASIC_ANNUAL ||
-    priceId === process.env.STRIPE_PRICE_ID_PRO_ANNUAL ||
-    priceId === process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL
+    priceId === process.env.STRIPE_PRICE_ID_PRO_ANNUAL
   ) {
     return "annual";
   }

@@ -44,8 +44,8 @@ export function PricingPreviewSection() {
         if (data.plans) {
           // Convert plans object to array and sort by plan order
           const plansArray = Object.values(data.plans) as Plan[];
-          // Sort: basic, professional, enterprise
-          const planOrder: PlanId[] = ["basic", "professional", "enterprise"];
+          // Sort: basic, professional
+          const planOrder: PlanId[] = ["basic", "professional"];
           plansArray.sort((a, b) => {
             return planOrder.indexOf(a.id) - planOrder.indexOf(b.id);
           });

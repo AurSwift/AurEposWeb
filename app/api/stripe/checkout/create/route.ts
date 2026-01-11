@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate plan ID
-    if (!["basic", "professional", "enterprise"].includes(planId)) {
+    if (!["basic", "professional"].includes(planId)) {
       return NextResponse.json({ error: "Invalid plan ID" }, { status: 400 });
     }
 

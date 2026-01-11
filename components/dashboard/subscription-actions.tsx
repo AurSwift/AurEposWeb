@@ -94,8 +94,8 @@ export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
         if (data.plans) {
           // Convert plans object to array
           const plansArray = Object.values(data.plans) as Plan[];
-          // Sort: basic, professional, enterprise
-          const planOrder: PlanId[] = ["basic", "professional", "enterprise"];
+          // Sort: basic, professional
+          const planOrder: PlanId[] = ["basic", "professional"];
           plansArray.sort((a, b) => {
             return planOrder.indexOf(a.id) - planOrder.indexOf(b.id);
           });
@@ -232,7 +232,7 @@ export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
               </p>
             </div>
           ),
-          duration: 10000, // Show for 10 seconds
+
         });
       } else {
         toast({

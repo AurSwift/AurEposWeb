@@ -10,7 +10,7 @@ function emailHeader(): string {
   return `
   <tr>
     <td style="padding: 40px 40px 20px; text-align: center;">
-      <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+      <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
     </td>
   </tr>
   `;
@@ -27,7 +27,7 @@ function emailFooter(): string {
         This is an automated message, please do not reply to this email.
       </p>
       <p style="margin: 10px 0 0; color: #999; font-size: 12px; line-height: 1.6; text-align: center;">
-        © ${new Date().getFullYear()} AuraSwift EPOS. All rights reserved.
+        © ${new Date().getFullYear()} aurswift. All rights reserved.
       </p>
     </td>
   </tr>

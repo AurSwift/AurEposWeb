@@ -84,7 +84,7 @@ export async function calculateHealthScore(
 ): Promise<HealthScoreResult> {
   const startTime = new Date(
     Date.now() - timeWindowHours * 60 * 60 * 1000
-  ).toISOString();
+  );
 
   // 1. Get event statistics
   const eventStats = await getEventStatistics(licenseKey, startTime);
@@ -163,7 +163,7 @@ export async function calculateHealthScore(
 /**
  * Get Event Statistics for License
  */
-async function getEventStatistics(licenseKey: string, startTime: string) {
+async function getEventStatistics(licenseKey: string, startTime: Date) {
   // Get acknowledgment stats
   const ackStats = await db
     .select({
@@ -493,7 +493,7 @@ export async function calculateAllHealthScores(): Promise<HealthScoreResult[]> {
     .where(
       gte(
         eventAcknowledgments.acknowledgedAt,
-        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       )
     );
 

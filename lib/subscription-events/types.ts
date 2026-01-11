@@ -21,7 +21,13 @@ export type SubscriptionEventType =
   | "license_revoked"
   | "license_reactivated"
   | "plan_changed"
-  | "heartbeat_ack"; // Server acknowledgment for connection health
+  | "heartbeat_ack"
+  | "terminal_added"
+  | "terminal_removed"
+  | "terminal_reconnected"
+  | "primary_changed"
+  | "state_sync"
+  | "deactivation_broadcast"; // Server acknowledgment for connection health
 
 /**
  * Base event structure
@@ -148,6 +154,20 @@ export interface HeartbeatAckEvent extends BaseSubscriptionEvent {
 }
 
 /**
+ * Coordination event (multi-terminal sync)
+ */
+export interface CoordinationEvent extends BaseSubscriptionEvent {
+  type:
+    | "terminal_added"
+    | "terminal_removed"
+    | "terminal_reconnected"
+    | "primary_changed"
+    | "state_sync"
+    | "deactivation_broadcast";
+  data: Record<string, any>;
+}
+
+/**
  * Union type for all subscription events
  */
 export type SubscriptionEvent =
@@ -159,7 +179,8 @@ export type SubscriptionEvent =
   | LicenseRevokedEvent
   | LicenseReactivatedEvent
   | PlanChangedEvent
-  | HeartbeatAckEvent;
+  | HeartbeatAckEvent
+  | CoordinationEvent;
 
 // ============================================================================
 // HELPER FUNCTIONS

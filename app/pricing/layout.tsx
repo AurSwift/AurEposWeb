@@ -3,14 +3,13 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Pricing Plans - AuraSwift",
   description:
-    "Choose the perfect plan for your business. Basic, Professional, and Enterprise plans available with flexible monthly or annual billing options.",
+    "Choose the perfect plan for your business. Basic and Professional plans available with flexible monthly or annual billing options.",
   keywords: [
     "pricing",
     "plans",
     "subscription",
     "basic plan",
     "professional plan",
-    "enterprise plan",
     "pos system",
     "terminal management",
   ],

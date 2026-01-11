@@ -217,6 +217,18 @@ export function getSubscriberCount(licenseKey: string): number {
 // ============================================================================
 
 /**
+ * Publish a generic subscription event
+ */
+export function publishGenericEvent(
+  licenseKey: string,
+  eventType: SubscriptionEventType,
+  data: any
+): void {
+  const event = createSubscriptionEvent(eventType, licenseKey, data);
+  publishEventSync(event);
+}
+
+/**
  * Publish subscription cancelled event
  */
 export function publishSubscriptionCancelled(
@@ -269,6 +281,7 @@ export function publishSubscriptionUpdated(
     newStatus: string;
     shouldDisable: boolean;
     gracePeriodRemaining: number | null;
+    trialEnd?: string | null;
   }
 ): void {
   const event = createSubscriptionEvent(

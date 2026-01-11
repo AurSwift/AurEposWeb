@@ -48,7 +48,7 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,

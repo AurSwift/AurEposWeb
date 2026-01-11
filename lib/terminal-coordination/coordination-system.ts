@@ -19,7 +19,7 @@ import {
   type NewTerminalCoordinationEvent,
 } from "@/lib/db/schema";
 import { eq, and, gte, sql, desc } from "drizzle-orm";
-import { publishEvent } from "@/lib/subscription-events/redis-publisher";
+import { publishGenericEvent } from "@/lib/subscription-events/redis-publisher";
 
 /**
  * Terminal Info Interface
@@ -67,7 +67,7 @@ export async function registerTerminalSession(
       .where(eq(terminalSessions.id, existing[0].id));
 
     // Publish terminal reconnected event
-    await publishTerminalEvent(licenseKey, "terminal_reconnected", {
+    publishGenericEvent(licenseKey, "terminal_reconnected", {
       machineIdHash: terminalInfo.machineIdHash,
       terminalName: existing[0].terminalName,
     });
@@ -107,7 +107,7 @@ export async function registerTerminalSession(
     .returning();
 
   // Publish terminal added event
-  await publishTerminalEvent(licenseKey, "terminal_added", {
+  publishGenericEvent(licenseKey, "terminal_added", {
     machineIdHash: terminalInfo.machineIdHash,
     terminalName: terminalInfo.terminalName,
     isPrimary: isFirstTerminal,
@@ -172,8 +172,7 @@ export async function disconnectTerminalSession(
     await promoteNewPrimaryTerminal(licenseKey);
   }
 
-  // Publish terminal removed event
-  await publishTerminalEvent(licenseKey, "terminal_removed", {
+  publishGenericEvent(licenseKey, "terminal_removed", {
     machineIdHash,
     terminalName: session[0].terminalName,
   });
@@ -196,7 +195,7 @@ export async function deactivateAllTerminals(
     .where(eq(terminalSessions.licenseKey, licenseKey));
 
   // Broadcast deactivation event to all terminals
-  await broadcastToAllTerminals(licenseKey, "deactivation_broadcast", {
+  publishGenericEvent(licenseKey, "deactivation_broadcast" as any, {
     reason: "license_deactivated",
     timestamp: new Date().toISOString(),
   });
@@ -257,7 +256,7 @@ export async function broadcastToAllTerminals(
   await db.insert(terminalCoordinationEvents).values(event);
 
   // Publish via SSE to all terminals
-  await publishEvent(licenseKey, eventType, payload);
+  publishGenericEvent(licenseKey, eventType as any, payload);
 }
 
 /**
@@ -282,7 +281,7 @@ export async function synchronizeTerminalState(
   const result = await db.insert(terminalStateSync).values(sync).returning();
 
   // Broadcast sync event
-  await publishEvent(licenseKey, "state_sync", {
+  publishGenericEvent(licenseKey, "state_sync", {
     syncId: result[0].id,
     syncType,
     payload,
@@ -350,7 +349,7 @@ async function promoteNewPrimaryTerminal(licenseKey: string): Promise<void> {
     .where(eq(terminalSessions.id, newPrimary.id));
 
   // Publish primary changed event
-  await publishTerminalEvent(licenseKey, "primary_changed", {
+  publishGenericEvent(licenseKey, "primary_changed", {
     newPrimaryMachineIdHash: newPrimary.machineIdHash,
     terminalName: newPrimary.terminalName,
   });
@@ -374,7 +373,7 @@ async function publishTerminalEvent(
   await db.insert(terminalCoordinationEvents).values(event);
 
   // Also publish via SSE
-  await publishEvent(licenseKey, eventType, payload);
+  publishGenericEvent(licenseKey, eventType as any, payload);
 }
 
 /**

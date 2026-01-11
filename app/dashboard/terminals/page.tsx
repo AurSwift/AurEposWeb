@@ -6,13 +6,24 @@ import {
   ArrowLeft,
   Terminal,
   MapPin,
-  Clock,
-  CheckCircle2,
-  XCircle,
+  Trash2,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 
 interface TerminalActivation {
@@ -36,16 +47,25 @@ interface LicenseKeyInfo {
   activationCount: number;
 }
 
+interface StaleInfo {
+  staleCount: number;
+  totalCount: number;
+}
+
 export default function TerminalsPage() {
   const [activations, setActivations] = useState<TerminalActivation[]>([]);
   const [licenseKeyInfo, setLicenseKeyInfo] = useState<LicenseKeyInfo | null>(
     null
   );
+  const [staleInfo, setStaleInfo] = useState<StaleInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   useEffect(() => {
     fetchTerminals();
+    fetchStaleInfo();
   }, []);
 
   const fetchTerminals = async () => {
@@ -69,6 +89,72 @@ export default function TerminalsPage() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStaleInfo = async () => {
+    try {
+      const response = await fetch("/api/terminals/cleanup", {
+        cache: "no-store",
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setStaleInfo({
+          staleCount: data.staleCount || 0,
+          totalCount: data.totalCount || 0,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch stale info:", err);
+    }
+  };
+
+  const handleDeactivate = async (activationId: string) => {
+    try {
+      setDeactivatingId(activationId);
+      const response = await fetch(`/api/terminals/${activationId}/deactivate`, {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to deactivate terminal");
+      }
+
+      // Refresh the terminal list
+      await fetchTerminals();
+      await fetchStaleInfo();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to deactivate terminal"
+      );
+    } finally {
+      setDeactivatingId(null);
+    }
+  };
+
+  const handleCleanup = async () => {
+    try {
+      setCleaningUp(true);
+      const response = await fetch("/api/terminals/cleanup", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to cleanup terminals");
+      }
+
+      // Refresh the terminal list
+      await fetchTerminals();
+      await fetchStaleInfo();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to cleanup terminals"
+      );
+    } finally {
+      setCleaningUp(false);
     }
   };
 
@@ -100,11 +186,21 @@ export default function TerminalsPage() {
     }
   };
 
+  const isStale = (activation: TerminalActivation) => {
+    if (!activation.isActive) return true;
+    if (!activation.lastHeartbeat) return true;
+    const hoursSinceHeartbeat =
+      (Date.now() - new Date(activation.lastHeartbeat).getTime()) /
+      (1000 * 60 * 60);
+    return hoursSinceHeartbeat > 24;
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto py-8 px-4">
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading terminals...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-muted-foreground mt-2">Loading terminals...</p>
         </div>
       </div>
     );
@@ -134,11 +230,45 @@ export default function TerminalsPage() {
         </Button>
       </div>
 
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Terminal Management</h1>
-        <p className="text-muted-foreground">
-          View and manage your activated terminals.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Terminal Management</h1>
+          <p className="text-muted-foreground">
+            View and manage your activated terminals.
+          </p>
+        </div>
+
+        {/* Cleanup Button */}
+        {staleInfo && staleInfo.staleCount > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={cleaningUp}>
+                {cleaningUp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Cleanup Stale ({staleInfo.staleCount})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cleanup Stale Terminals?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove {staleInfo.staleCount} stale terminal(s) that
+                  are either inactive or haven&apos;t connected in over 24 hours.
+                  This will free up {staleInfo.staleCount} license slot(s).
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCleanup}>
+                  Cleanup Terminals
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {licenseKeyInfo && (
@@ -174,8 +304,11 @@ export default function TerminalsPage() {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Activated Terminals</CardTitle>
+          <Button variant="ghost" size="sm" onClick={fetchTerminals}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           {activations.length === 0 ? (
@@ -194,7 +327,11 @@ export default function TerminalsPage() {
               {activations.map((activation) => (
                 <div
                   key={activation.id}
-                  className="border rounded-lg p-4 space-y-3 hover:bg-muted/50 transition-colors"
+                  className={`border rounded-lg p-4 space-y-3 transition-colors ${
+                    isStale(activation)
+                      ? "bg-muted/30 border-dashed"
+                      : "hover:bg-muted/50"
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -206,6 +343,11 @@ export default function TerminalsPage() {
                         {getStatusBadge(
                           activation.isActive,
                           activation.lastHeartbeat
+                        )}
+                        {isStale(activation) && activation.isActive && (
+                          <Badge variant="outline" className="text-orange-600 border-orange-300">
+                            Stale
+                          </Badge>
                         )}
                       </div>
 
@@ -292,6 +434,49 @@ export default function TerminalsPage() {
                         </div>
                       </details>
                     </div>
+
+                    {/* Deactivate Button */}
+                    {activation.isActive && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            disabled={deactivatingId === activation.id}
+                          >
+                            {deactivatingId === activation.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Deactivate Terminal?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to deactivate &quot;
+                              {activation.terminalName || "Unnamed Terminal"}
+                              &quot;? This will free up 1 license slot. The
+                              terminal will need to be reactivated to use it
+                              again.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeactivate(activation.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Deactivate
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
               ))}

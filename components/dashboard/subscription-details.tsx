@@ -116,7 +116,6 @@ export function SubscriptionDetails({
     const names: Record<string, string> = {
       basic: "Basic",
       professional: "Professional",
-      enterprise: "Enterprise",
     };
     return names[planId] || planId;
   };

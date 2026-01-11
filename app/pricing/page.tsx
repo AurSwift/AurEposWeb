@@ -48,8 +48,7 @@ function PricingPageContent() {
     if (
       planParam &&
       (planParam === "basic" ||
-        planParam === "professional" ||
-        planParam === "enterprise")
+        planParam === "professional")
     ) {
       setFormData((prev) => ({
         ...prev,
@@ -78,7 +77,7 @@ function PricingPageContent() {
           }
           
           // Basic validation of plan structure
-          const planIds: PlanId[] = ["basic", "professional", "enterprise"];
+          const planIds: PlanId[] = ["basic", "professional"];
           for (const planId of planIds) {
             if (!data.plans[planId]) {
               console.warn(`Missing plan: ${planId}`);

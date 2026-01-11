@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
+import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import {
   subscriptions,
@@ -7,7 +8,7 @@ import {
   subscriptionChanges,
   activations,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, inArray } from "drizzle-orm";
 import {
   getStripePriceId,
   getPlan,
@@ -123,14 +124,14 @@ export async function POST(request: NextRequest) {
     let invoiceUrl: string | null = null;
 
     try {
-      const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+      const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
         customer: currentSub.stripeCustomerId!,
         subscription: currentSub.stripeSubscriptionId,
-      });
+      }) as Stripe.Invoice;
 
       // Calculate proration from invoice lines
       const prorationLines = upcomingInvoice.lines.data.filter(
-        (line) => line.proration
+        (line) => (line as any).proration
       );
 
       const prorationAmountCents = prorationLines.reduce(
@@ -143,8 +144,13 @@ export async function POST(request: NextRequest) {
 
       // Check if there's an immediate invoice for the proration
       if (upcomingInvoice.id && upcomingInvoice.id !== "upcoming") {
-        stripePaymentId = upcomingInvoice.payment_intent as string | null;
-        invoiceUrl = upcomingInvoice.hosted_invoice_url;
+        // Handle payment_intent which can be string, PaymentIntent object, or null
+        const paymentIntent = (upcomingInvoice as any).payment_intent;
+        stripePaymentId =
+          typeof paymentIntent === "string"
+            ? paymentIntent
+            : (paymentIntent as { id?: string } | null)?.id || null;
+        invoiceUrl = upcomingInvoice.hosted_invoice_url || null;
       }
     } catch (prorationError) {
       // If we can't retrieve the upcoming invoice, log but continue
@@ -215,12 +221,28 @@ export async function POST(request: NextRequest) {
       // After trial: Force reactivation (old behavior)
       
       // Get existing activations before revoking licenses
-      const existingActivations = isInTrial
-        ? await tx
+      // First get license keys for this subscription, then get their activations
+      let existingActivations: typeof activations.$inferSelect[] = [];
+      if (isInTrial) {
+        // Get all license keys for this subscription
+        const subscriptionLicenseKeys = await tx
+          .select({ licenseKey: licenseKeys.licenseKey })
+          .from(licenseKeys)
+          .where(eq(licenseKeys.subscriptionId, subscriptionId));
+        
+        if (subscriptionLicenseKeys.length > 0) {
+          // Get activations for all these license keys
+          const licenseKeyValues = subscriptionLicenseKeys.map(k => k.licenseKey);
+          existingActivations = await tx
             .select()
             .from(activations)
-            .where(eq(activations.subscriptionId, subscriptionId))
-        : [];
+            .where(
+              licenseKeyValues.length === 1
+                ? eq(activations.licenseKey, licenseKeyValues[0])
+                : inArray(activations.licenseKey, licenseKeyValues)
+            );
+        }
+      }
 
       await tx
         .update(licenseKeys)
@@ -257,7 +279,7 @@ export async function POST(request: NextRequest) {
           await tx
             .update(activations)
             .set({
-              licenseKeyId: insertedLicense.id,
+              licenseKey: newLicenseKey, // Update to new license key string
               updatedAt: new Date(),
             })
             .where(eq(activations.id, activation.id));

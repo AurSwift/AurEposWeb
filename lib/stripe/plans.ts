@@ -1,7 +1,7 @@
 import { stripe } from "./client";
 import type Stripe from "stripe";
 
-export type PlanId = "basic" | "professional" | "enterprise";
+export type PlanId = "basic" | "professional";
 export type BillingCycle = "monthly" | "annual";
 
 export interface PlanFeatures {
@@ -51,34 +51,16 @@ const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
     maxTerminals: 5,
     features: [
       "Up to 5 terminals",
-      "Advanced inventory management",
-      "Multi-location support",
+      "Basic inventory management",
+      "Sales reporting",
       "Advanced reporting & analytics",
-      "API access",
       "Priority email support (24hr response)",
     ],
     limits: {
       users: 5,
       storage: "50GB",
-      apiAccess: true,
+      apiAccess: false,
       support: "priority_email",
-    },
-  },
-  enterprise: {
-    maxTerminals: 50, // Up to 50 terminals for enterprise
-    features: [
-      "Up to 50 terminals",
-      "Custom integrations",
-      "Dedicated account manager",
-      "24/7 phone support",
-      "Custom SLA",
-      "White-label options",
-    ],
-    limits: {
-      users: -1, // Unlimited
-      storage: "Unlimited",
-      apiAccess: true,
-      support: "phone_24_7",
     },
   },
 };
@@ -90,13 +72,11 @@ const POPULAR_PLANS: PlanId[] = ["professional"];
 const PLAN_NAMES: Record<PlanId, string> = {
   basic: "Basic",
   professional: "Professional",
-  enterprise: "Enterprise",
 };
 
 const PLAN_DESCRIPTIONS: Record<PlanId, string> = {
   basic: "Perfect for small businesses",
   professional: "For growing businesses",
-  enterprise: "For large organizations",
 };
 
 // In-memory cache for plans
@@ -117,10 +97,6 @@ async function fetchPlansFromEnvPriceIds(): Promise<Record<PlanId, Plan>> {
     professional: {
       monthly: process.env.STRIPE_PRICE_ID_PRO_MONTHLY,
       annual: process.env.STRIPE_PRICE_ID_PRO_ANNUAL,
-    },
-    enterprise: {
-      monthly: process.env.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY,
-      annual: process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL,
     },
   };
 
@@ -183,7 +159,7 @@ async function fetchPlansFromEnvPriceIds(): Promise<Record<PlanId, Plan>> {
   }
 
   // Validate we have all required plans
-  const requiredPlans: PlanId[] = ["basic", "professional", "enterprise"];
+  const requiredPlans: PlanId[] = ["basic", "professional"];
   const missingPlans = requiredPlans.filter((id) => !plans[id]);
 
   if (missingPlans.length > 0) {
@@ -292,7 +268,7 @@ async function fetchPlansFromStripe(): Promise<Record<PlanId, Plan>> {
     }
 
     // Validate we have all required plans
-    const requiredPlans: PlanId[] = ["basic", "professional", "enterprise"];
+    const requiredPlans: PlanId[] = ["basic", "professional"];
     const missingPlans = requiredPlans.filter((id) => !plans[id]);
 
     if (missingPlans.length > 0) {
@@ -342,7 +318,7 @@ async function fetchPlansFromStripe(): Promise<Record<PlanId, Plan>> {
  * Type guard to validate plan IDs
  */
 function isValidPlanId(id: string): id is PlanId {
-  return ["basic", "professional", "enterprise"].includes(id);
+  return ["basic", "professional"].includes(id);
 }
 
 /**

@@ -11,8 +11,8 @@ import { NextResponse } from "next/server";
 import { isRedisConfigured, isRedisHealthy, getRedisStatus } from "@/lib/redis";
 
 export async function GET() {
-  const status = getRedisStatus();
-  const healthy = await isRedisHealthy();
+  const status = await getRedisStatus();
+  const healthy = status.healthy;
 
   const response = {
     status: healthy ? "healthy" : status.configured ? "degraded" : "fallback",

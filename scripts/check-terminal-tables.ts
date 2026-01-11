@@ -17,12 +17,12 @@ async function checkTables() {
       );
     `);
     
-    console.log("Table exists:", result.rows[0]);
+    console.log("Table exists:", result[0]);
     
     // If table exists, get count
-    if (result.rows[0]?.exists) {
+    if (result[0]?.exists) {
       const count = await db.execute(sql`SELECT COUNT(*) FROM terminal_sessions;`);
-      console.log("Terminal sessions count:", count.rows[0]);
+      console.log("Terminal sessions count:", count[0]);
     }
     
   } catch (error) {

@@ -198,12 +198,16 @@ export async function isRedisHealthy(): Promise<boolean> {
 /**
  * Get Redis connection status
  */
-export function getRedisStatus(): {
+export async function getRedisStatus(): Promise<{
   configured: boolean;
   publisherConnected: boolean;
-} {
+  healthy: boolean;
+  error?: string;
+}> {
+  const healthy = await isRedisHealthy();
   return {
     configured: isRedisConfigured(),
     publisherConnected: publisherInstance?.status === "ready",
+    healthy,
   };
 }

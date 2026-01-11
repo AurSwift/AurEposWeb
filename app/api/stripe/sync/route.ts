@@ -96,13 +96,17 @@ export async function POST(request: NextRequest) {
     });
 
     for (const invoice of invoicesList.data) {
+      // Cast to any to access properties that exist at runtime but aren't in TypeScript definitions
+      const invoiceAny = invoice as any;
+      
       // Find subscription if exists
       let subscriptionId: string | null = null;
-      if (invoice.subscription) {
+      const invoiceSubscription = invoiceAny.subscription as string | Stripe.Subscription | null | undefined;
+      if (invoiceSubscription) {
         const subId =
-          typeof invoice.subscription === "string"
-            ? invoice.subscription
-            : invoice.subscription.id;
+          typeof invoiceSubscription === "string"
+            ? invoiceSubscription
+            : invoiceSubscription.id;
         const [sub] = await db
           .select()
           .from(subscriptions)
@@ -119,48 +123,48 @@ export async function POST(request: NextRequest) {
           stripeInvoiceId: invoice.id,
           stripeCustomerId: stripeCustomerId,
           stripeSubscriptionId:
-            typeof invoice.subscription === "string"
-              ? invoice.subscription
-              : invoice.subscription?.id || null,
-          number: invoice.number || null,
-          status: invoice.status || "open",
-          subtotal: invoice.subtotal || 0,
-          tax: invoice.tax || 0,
-          total: invoice.total || 0,
-          amountDue: invoice.amount_due || 0,
-          amountPaid: invoice.amount_paid || 0,
-          amountRemaining: invoice.amount_remaining || 0,
-          currency: invoice.currency || "usd",
-          hostedInvoiceUrl: invoice.hosted_invoice_url || null,
-          invoicePdf: invoice.invoice_pdf || null,
+            typeof invoiceSubscription === "string"
+              ? invoiceSubscription
+              : invoiceSubscription?.id || null,
+          number: invoiceAny.number || null,
+          status: invoiceAny.status || "open",
+          subtotal: invoiceAny.subtotal || 0,
+          tax: invoiceAny.tax || 0,
+          total: invoiceAny.total || 0,
+          amountDue: invoiceAny.amount_due || 0,
+          amountPaid: invoiceAny.amount_paid || 0,
+          amountRemaining: invoiceAny.amount_remaining || 0,
+          currency: invoiceAny.currency || "usd",
+          hostedInvoiceUrl: invoiceAny.hosted_invoice_url || null,
+          invoicePdf: invoiceAny.invoice_pdf || null,
           periodStart:
-            invoice.period_start && invoice.period_start > 0
-              ? new Date(invoice.period_start * 1000)
+            invoiceAny.period_start && invoiceAny.period_start > 0
+              ? new Date(invoiceAny.period_start * 1000)
               : null,
           periodEnd:
-            invoice.period_end && invoice.period_end > 0
-              ? new Date(invoice.period_end * 1000)
+            invoiceAny.period_end && invoiceAny.period_end > 0
+              ? new Date(invoiceAny.period_end * 1000)
               : null,
           dueDate:
-            invoice.due_date && invoice.due_date > 0
-              ? new Date(invoice.due_date * 1000)
+            invoiceAny.due_date && invoiceAny.due_date > 0
+              ? new Date(invoiceAny.due_date * 1000)
               : null,
           paidAt:
-            invoice.status === "paid" && invoice.status_transitions?.paid_at
-              ? new Date(invoice.status_transitions.paid_at * 1000)
+            invoiceAny.status === "paid" && invoiceAny.status_transitions?.paid_at
+              ? new Date(invoiceAny.status_transitions.paid_at * 1000)
               : null,
-          description: invoice.description || null,
-          metadata: (invoice.metadata as Record<string, unknown>) || null,
+          description: invoiceAny.description || null,
+          metadata: (invoiceAny.metadata as Record<string, unknown>) || null,
         })
         .onConflictDoUpdate({
           target: invoices.stripeInvoiceId,
           set: {
-            status: invoice.status || "open",
-            amountPaid: invoice.amount_paid || 0,
-            amountRemaining: invoice.amount_remaining || 0,
+            status: invoiceAny.status || "open",
+            amountPaid: invoiceAny.amount_paid || 0,
+            amountRemaining: invoiceAny.amount_remaining || 0,
             paidAt:
-              invoice.status === "paid" && invoice.status_transitions?.paid_at
-                ? new Date(invoice.status_transitions.paid_at * 1000)
+              invoiceAny.status === "paid" && invoiceAny.status_transitions?.paid_at
+                ? new Date(invoiceAny.status_transitions.paid_at * 1000)
                 : null,
             updatedAt: new Date(),
           },
@@ -169,12 +173,12 @@ export async function POST(request: NextRequest) {
       syncedInvoices++;
 
       // Create payment record for paid invoices that don't have a payment record yet
-      if (invoice.status === "paid" && invoice.amount_paid > 0) {
+      if (invoiceAny.status === "paid" && invoiceAny.amount_paid > 0) {
         // Check if payment record already exists for this invoice
         const paymentIntentId =
-          typeof invoice.payment_intent === "string"
-            ? invoice.payment_intent
-            : invoice.payment_intent?.id || null;
+          typeof invoiceAny.payment_intent === "string"
+            ? invoiceAny.payment_intent
+            : invoiceAny.payment_intent?.id || null;
         
         const stripePaymentId = paymentIntentId || invoice.id;
         
@@ -193,13 +197,13 @@ export async function POST(request: NextRequest) {
               subscriptionId,
               {
                 id: invoice.id,
-                amount_paid: invoice.amount_paid,
-                amount_due: invoice.amount_due || 0,
-                currency: invoice.currency,
+                amount_paid: invoiceAny.amount_paid,
+                amount_due: invoiceAny.amount_due || 0,
+                currency: invoiceAny.currency,
                 payment_intent: stripePaymentId,
-                hosted_invoice_url: invoice.hosted_invoice_url || null,
-                period_start: invoice.period_start,
-                period_end: invoice.period_end,
+                hosted_invoice_url: invoiceAny.hosted_invoice_url || null,
+                period_start: invoiceAny.period_start,
+                period_end: invoiceAny.period_end,
               },
               "completed"
             );

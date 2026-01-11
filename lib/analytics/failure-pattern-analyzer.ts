@@ -55,7 +55,7 @@ export async function analyzeFailurePatterns(
   const patterns: DetectedPattern[] = [];
   const startTime = new Date(
     Date.now() - timeWindowHours * 60 * 60 * 1000
-  ).toISOString();
+  );
 
   // 1. Detect burst failures (rapid consecutive failures)
   const burstPatterns = await detectBurstFailures(licenseKey, startTime);
@@ -89,7 +89,7 @@ export async function analyzeFailurePatterns(
  */
 async function detectBurstFailures(
   licenseKey: string | undefined,
-  startTime: string
+  startTime: Date
 ): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 
@@ -168,7 +168,7 @@ async function detectBurstFailures(
  */
 async function detectTimeoutPatterns(
   licenseKey: string | undefined,
-  startTime: string
+  startTime: Date
 ): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 
@@ -223,7 +223,7 @@ async function detectTimeoutPatterns(
  */
 async function detectNetworkErrors(
   licenseKey: string | undefined,
-  startTime: string
+  startTime: Date
 ): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 
@@ -280,7 +280,7 @@ async function detectNetworkErrors(
  */
 async function detectParsingErrors(
   licenseKey: string | undefined,
-  startTime: string
+  startTime: Date
 ): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 
@@ -337,7 +337,7 @@ async function detectParsingErrors(
  */
 async function detectRateLimitErrors(
   licenseKey: string | undefined,
-  startTime: string
+  startTime: Date
 ): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 

@@ -15,6 +15,13 @@
       "when": 1767990398403,
       "tag": "0001_quiet_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768132000000,
+      "tag": "0002_fix_machine_id_hash_length",
+      "breakpoints": true
     }
   ]
 }

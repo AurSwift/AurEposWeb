@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
+import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { subscriptions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -93,7 +94,8 @@ export async function POST(request: NextRequest) {
       );
 
       // Preview the invoice with the subscription item change
-      const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+      // Note: retrieveUpcoming exists in Stripe API but TypeScript types may not include it
+      const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
         customer: currentSub.stripeCustomerId!,
         subscription: currentSub.stripeSubscriptionId,
         subscription_items: [
@@ -103,11 +105,11 @@ export async function POST(request: NextRequest) {
           },
         ],
         subscription_proration_behavior: "create_prorations",
-      });
+      }) as Stripe.Invoice;
 
       // Calculate proration details
       const prorationLines = upcomingInvoice.lines.data.filter(
-        (line) => line.proration
+        (line: any) => line.proration
       );
 
       const prorationAmountCents = prorationLines.reduce(

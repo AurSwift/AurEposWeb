@@ -26,7 +26,6 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
   
   const getPlanIcon = (planName: string) => {
     const normalized = planName.toLowerCase();
-    if (normalized.includes("enterprise")) return <Shield className="w-5 h-5 text-primary" />;
     if (normalized.includes("professional")) return <Crown className="w-5 h-5 text-primary" />;
     return <Zap className="w-5 h-5 text-primary" />;
   };

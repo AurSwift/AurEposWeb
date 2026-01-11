@@ -52,9 +52,9 @@ export async function sendTrialEnding3DaysEmail(
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: data.email,
-      subject: "Your AuraSwift Trial Ends in 3 Days",
+      subject: "Your aurswift Trial Ends in 3 Days",
       html: generateTrialEnding3DaysTemplate(data),
       text: generateTrialEnding3DaysText(data),
     };
@@ -94,9 +94,9 @@ export async function sendTrialEnding1DayEmail(
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: data.email,
-      subject: "Your AuraSwift Trial Ends Tomorrow",
+      subject: "Your aurswift Trial Ends Tomorrow",
       html: generateTrialEnding1DayTemplate(data),
       text: generateTrialEnding1DayText(data),
     };
@@ -136,9 +136,9 @@ export async function sendTrialEndedEmail(
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: data.email,
-      subject: "Your AuraSwift Trial Has Ended - Add Payment Method",
+      subject: "Your aurswift Trial Has Ended - Add Payment Method",
       html: generateTrialEndedTemplate(data),
       text: generateTrialEndedText(data),
     };
@@ -190,7 +190,7 @@ export async function sendCancellationConfirmationEmail(
     }
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: data.email,
       subject,
       html: generateCancellationConfirmationTemplate(data),
@@ -232,9 +232,9 @@ export async function sendGracePeriodEndingEmail(
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: data.email,
-      subject: `Your AuraSwift Access Ends in ${data.daysRemaining} ${
+      subject: `Your aurswift Access Ends in ${data.daysRemaining} ${
         data.daysRemaining === 1 ? "Day" : "Days"
       }`,
       html: generateGracePeriodEndingTemplate(data),
@@ -279,9 +279,9 @@ export async function sendLicenseDeactivatedEmail(data: {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"AuraSwift EPOS" <${fromEmail}>`,
+      from: `"aurswift" <${fromEmail}>`,
       to: data.email,
-      subject: "Your AuraSwift License Has Been Deactivated",
+      subject: "Your aurswift License Has Been Deactivated",
       html: generateLicenseDeactivatedTemplate(data),
       text: generateLicenseDeactivatedText(data),
     };
@@ -323,7 +323,7 @@ function generateTrialEnding3DaysTemplate(data: TrialNotificationData): string {
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
             </td>
           </tr>
           
@@ -339,7 +339,7 @@ function generateTrialEnding3DaysTemplate(data: TrialNotificationData): string {
                 }</strong> trial will end on <strong>${data.trialEndDate.toLocaleDateString()}</strong>.
               </p>
               <p style="margin: 0 0 30px; color: #666; font-size: 16px; line-height: 1.6;">
-                To continue using AuraSwift EPOS without interruption, please add your payment method before your trial expires.
+                To continue using aurswift without interruption, please add your payment method before your trial expires.
               </p>
               
               <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -395,7 +395,7 @@ function generateTrialEnding1DayTemplate(data: TrialNotificationData): string {
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
             </td>
           </tr>
           
@@ -470,7 +470,7 @@ function generateTrialEndedTemplate(data: TrialNotificationData): string {
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
             </td>
           </tr>
           
@@ -486,7 +486,7 @@ function generateTrialEndedTemplate(data: TrialNotificationData): string {
                 }</strong> trial ended on <strong>${data.trialEndDate.toLocaleDateString()}</strong>.
               </p>
               <p style="margin: 0 0 30px; color: #666; font-size: 16px; line-height: 1.6;">
-                To reactivate your account and continue using AuraSwift EPOS, please add your payment method.
+                To reactivate your account and continue using aurswift, please add your payment method.
               </p>
               
               <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -542,7 +542,7 @@ function generateCancellationConfirmationTemplate(
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
             </td>
           </tr>
           
@@ -583,7 +583,7 @@ function generateCancellationConfirmationTemplate(
                       ℹ️ Trial Access Preserved Until Trial End
                     </p>
                     <p style="margin: 0; color: #0c5460; font-size: 14px; line-height: 1.6;">
-                      You'll retain full access to AuraSwift EPOS until your trial ends on <strong>${data.accessEndDate.toLocaleDateString()}</strong>. No charges will be made. After your trial ends, you'll have a <strong>7-day grace period</strong> to export your data.
+                      You'll retain full access to aurswift until your trial ends on <strong>${data.accessEndDate.toLocaleDateString()}</strong>. No charges will be made. After your trial ends, you'll have a <strong>7-day grace period</strong> to export your data.
                     </p>
                   </div>`;
                 }
@@ -604,7 +604,7 @@ function generateCancellationConfirmationTemplate(
                     ℹ️ Access Preserved Until Billing Period End
                   </p>
                   <p style="margin: 0; color: #0c5460; font-size: 14px; line-height: 1.6;">
-                    You'll retain full access to AuraSwift EPOS until your billing period ends on <strong>${data.accessEndDate.toLocaleDateString()}</strong>. After that, you'll have a <strong>7-day grace period</strong> to export your data before your license is deactivated.
+                    You'll retain full access to aurswift until your billing period ends on <strong>${data.accessEndDate.toLocaleDateString()}</strong>. After that, you'll have a <strong>7-day grace period</strong> to export your data before your license is deactivated.
                   </p>
                 </div>`;
               })()}
@@ -657,7 +657,7 @@ function generateGracePeriodEndingTemplate(data: GracePeriodData): string {
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
             </td>
           </tr>
           
@@ -676,7 +676,7 @@ function generateGracePeriodEndingTemplate(data: GracePeriodData): string {
                 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
               </p>
               <p style="margin: 0 0 20px; color: #666; font-size: 16px; line-height: 1.6;">
-                Your AuraSwift EPOS access will end on <strong>${data.gracePeriodEndDate.toLocaleDateString()}</strong>.
+                Your aurswift access will end on <strong>${data.gracePeriodEndDate.toLocaleDateString()}</strong>.
               </p>
               <p style="margin: 0 0 30px; color: #666; font-size: 16px; line-height: 1.6;">
                 To restore full access, please reactivate your <strong>${
@@ -743,7 +743,7 @@ function generateLicenseDeactivatedTemplate(data: {
         <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center;">
-              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">AuraSwift EPOS</h1>
+              <h1 style="margin: 0; color: #333; font-size: 32px; font-weight: bold;">aurswift</h1>
             </td>
           </tr>
           
@@ -754,7 +754,7 @@ function generateLicenseDeactivatedTemplate(data: {
                 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
               </p>
               <p style="margin: 0 0 20px; color: #666; font-size: 16px; line-height: 1.6;">
-                Your AuraSwift EPOS license has been deactivated. Your desktop application will no longer have access to process transactions.
+                Your aurswift license has been deactivated. Your desktop application will no longer have access to process transactions.
               </p>
               
               <div style="margin: 30px 0; padding: 20px; background-color: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
@@ -804,7 +804,7 @@ function generateTrialEnding3DaysText(data: TrialNotificationData): string {
     data.billingUrl || `${process.env.NEXTAUTH_URL}/dashboard/billing`;
 
   return `
-AuraSwift EPOS - Your Trial Ends in 3 Days
+aurswift - Your Trial Ends in 3 Days
 
 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
 
@@ -812,7 +812,7 @@ Your ${
     data.planName
   } trial will end on ${data.trialEndDate.toLocaleDateString()}.
 
-To continue using AuraSwift EPOS without interruption, please add your payment method before your trial expires.
+To continue using aurswift without interruption, please add your payment method before your trial expires.
 
 Add Payment Method: ${billingUrl}
 
@@ -830,7 +830,7 @@ function generateTrialEnding1DayText(data: TrialNotificationData): string {
     data.billingUrl || `${process.env.NEXTAUTH_URL}/dashboard/billing`;
 
   return `
-AuraSwift EPOS - Your Trial Ends Tomorrow
+aurswift - Your Trial Ends Tomorrow
 
 ⏰ LAST CHANCE TO ADD PAYMENT
 
@@ -856,13 +856,13 @@ function generateTrialEndedText(data: TrialNotificationData): string {
     data.billingUrl || `${process.env.NEXTAUTH_URL}/dashboard/billing`;
 
   return `
-AuraSwift EPOS - Your Trial Has Ended
+aurswift - Your Trial Has Ended
 
 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
 
 Your ${data.planName} trial ended on ${data.trialEndDate.toLocaleDateString()}.
 
-To reactivate your account and continue using AuraSwift EPOS, please add your payment method.
+To reactivate your account and continue using aurswift, please add your payment method.
 
 Reactivate Your Account: ${billingUrl}
 
@@ -898,7 +898,7 @@ Your trial has been cancelled and access has ended immediately. You have a 7-day
   } else if (data.wasInTrial && !data.cancelImmediately) {
     accessMessage = `ℹ️ TRIAL ACCESS PRESERVED UNTIL TRIAL END
 
-You'll retain full access to AuraSwift EPOS until your trial ends on ${data.accessEndDate.toLocaleDateString()}. No charges will be made. After your trial ends, you'll have a 7-day grace period to export your data.`;
+You'll retain full access to aurswift until your trial ends on ${data.accessEndDate.toLocaleDateString()}. No charges will be made. After your trial ends, you'll have a 7-day grace period to export your data.`;
   } else if (!data.wasInTrial && data.cancelImmediately) {
     accessMessage = `⚠️ ACCESS ENDED IMMEDIATELY
 
@@ -906,11 +906,11 @@ Your subscription has been cancelled and access has ended immediately. You have 
   } else {
     accessMessage = `ℹ️ ACCESS PRESERVED UNTIL BILLING PERIOD END
 
-You'll retain full access to AuraSwift EPOS until your billing period ends on ${data.accessEndDate.toLocaleDateString()}. After that, you'll have a 7-day grace period to export your data before your license is deactivated.`;
+You'll retain full access to aurswift until your billing period ends on ${data.accessEndDate.toLocaleDateString()}. After that, you'll have a 7-day grace period to export your data before your license is deactivated.`;
   }
 
   return `
-AuraSwift EPOS - ${subject}
+aurswift - ${subject}
 
 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
 
@@ -936,7 +936,7 @@ function generateGracePeriodEndingText(data: GracePeriodData): string {
     data.reactivateUrl || `${process.env.NEXTAUTH_URL}/dashboard/billing`;
 
   return `
-AuraSwift EPOS - Your Access Ends in ${data.daysRemaining} ${
+aurswift - Your Access Ends in ${data.daysRemaining} ${
     data.daysRemaining === 1 ? "Day" : "Days"
   }
 
@@ -944,7 +944,7 @@ AuraSwift EPOS - Your Access Ends in ${data.daysRemaining} ${
 
 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
 
-Your AuraSwift EPOS access will end on ${data.gracePeriodEndDate.toLocaleDateString()}.
+Your aurswift access will end on ${data.gracePeriodEndDate.toLocaleDateString()}.
 
 To restore full access, please reactivate your ${data.planName} subscription.
 
@@ -970,11 +970,11 @@ function generateLicenseDeactivatedText(data: {
     data.reactivateUrl || `${process.env.NEXTAUTH_URL}/dashboard/billing`;
 
   return `
-AuraSwift EPOS - Your License Has Been Deactivated
+aurswift - Your License Has Been Deactivated
 
 ${data.userName ? `Hi ${data.userName},` : "Hello,"}
 
-Your AuraSwift EPOS license has been deactivated. Your desktop application will no longer have access to process transactions.
+Your aurswift license has been deactivated. Your desktop application will no longer have access to process transactions.
 
 💾 YOUR DATA IS SAFE
 We retain your account data for 90 days. You can reactivate anytime and pick up right where you left off.

@@ -10,20 +10,19 @@ The application now fetches all plan information (prices, names, descriptions) d
 
 ### Required Products
 
-You need to create 3 products in Stripe, one for each plan:
+You need to create 2 products in Stripe, one for each plan:
 
 1. **Basic Plan** - `metadata.planId = "basic"`
 2. **Professional Plan** - `metadata.planId = "professional"`
-3. **Enterprise Plan** - `metadata.planId = "enterprise"`
 
 ### Product Configuration
 
 For each product:
 
-1. **Product Name**: The name displayed on the pricing page (e.g., "Basic", "Professional", "Enterprise")
+1. **Product Name**: The name displayed on the pricing page (e.g., "Basic", "Professional")
 2. **Product Description**: The description shown on the pricing page
 3. **Metadata**: Add the following metadata fields:
-   - **`planId`**: One of `basic`, `professional`, or `enterprise` (required)
+   - **`planId`**: One of `basic` or `professional` (required)
    - **`popular`**: Set to `true` to mark as "Most Popular" (optional)
    - **`features`**: JSON string with plan features (optional, see below)
 
@@ -84,14 +83,6 @@ Each product must have **exactly 2 prices**:
 - **Monthly Price**: $99/month (9900 cents, recurring monthly)
 - **Annual Price**: $950/year (95000 cents, recurring yearly)
 
-#### Enterprise Plan Product
-
-- **Name**: "Enterprise"
-- **Description**: "For large organizations"
-- **Metadata**: `planId = "enterprise"`
-- **Monthly Price**: $299/month (29900 cents, recurring monthly)
-- **Annual Price**: $2870/year (287000 cents, recurring yearly)
-
 ## How It Works
 
 1. **Caching**: Plans are cached in memory for 15 minutes to reduce Stripe API calls
@@ -114,7 +105,7 @@ No environment variables are needed for Price IDs anymore! The system automatica
 
 To test the setup:
 
-1. Ensure all 3 products exist in Stripe with correct metadata
+1. Ensure both products exist in Stripe with correct metadata
 2. Ensure each product has both monthly and annual prices
 3. Call `/api/subscriptions/plans` endpoint - it should return all plans with prices from Stripe
 4. Check the browser console for any warnings about missing plans
@@ -123,7 +114,7 @@ To test the setup:
 
 ### "Missing required plans in Stripe" error
 
-- Ensure all 3 products exist with `metadata.planId` set correctly
+- Ensure both products exist with `metadata.planId` set correctly
 - Ensure products are marked as "Active" in Stripe
 
 ### "Missing monthly or annual price" warning

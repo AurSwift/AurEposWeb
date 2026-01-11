@@ -50,8 +50,8 @@ export async function aggregatePerformanceMetrics(
 
   // Get all acknowledgments in this hour
   const whereConditions = [
-    gte(eventAcknowledgments.acknowledgedAt, startTime.toISOString()),
-    lte(eventAcknowledgments.acknowledgedAt, endTime.toISOString()),
+    gte(eventAcknowledgments.acknowledgedAt, startTime),
+    lte(eventAcknowledgments.acknowledgedAt, endTime),
   ];
 
   if (licenseKey) {
@@ -90,8 +90,8 @@ export async function aggregatePerformanceMetrics(
             and acknowledged_at >= ${startTime.toISOString()}
             and acknowledged_at < ${endTime.toISOString()}
           )`,
-          gte(eventRetryHistory.attemptedAt, startTime.toISOString()),
-          lte(eventRetryHistory.attemptedAt, endTime.toISOString())
+          gte(eventRetryHistory.attemptedAt, startTime),
+          lte(eventRetryHistory.attemptedAt, endTime)
         )
       );
 
@@ -104,8 +104,8 @@ export async function aggregatePerformanceMetrics(
       .where(
         and(
           eq(deadLetterQueue.licenseKey, agg.licenseKey),
-          gte(deadLetterQueue.failedAt, startTime.toISOString()),
-          lte(deadLetterQueue.failedAt, endTime.toISOString())
+          gte(deadLetterQueue.failedAt, startTime),
+          lte(deadLetterQueue.failedAt, endTime)
         )
       );
 
@@ -142,8 +142,8 @@ export async function aggregatePerformanceMetrics(
       .from(eventAcknowledgments)
       .where(
         and(
-          gte(eventAcknowledgments.acknowledgedAt, startTime.toISOString()),
-          lte(eventAcknowledgments.acknowledgedAt, endTime.toISOString())
+          gte(eventAcknowledgments.acknowledgedAt, startTime),
+          lte(eventAcknowledgments.acknowledgedAt, endTime)
         )
       );
 
@@ -155,8 +155,8 @@ export async function aggregatePerformanceMetrics(
         .from(eventRetryHistory)
         .where(
           and(
-            gte(eventRetryHistory.attemptedAt, startTime.toISOString()),
-            lte(eventRetryHistory.attemptedAt, endTime.toISOString())
+            gte(eventRetryHistory.attemptedAt, startTime),
+            lte(eventRetryHistory.attemptedAt, endTime)
           )
         );
 
@@ -167,8 +167,8 @@ export async function aggregatePerformanceMetrics(
         .from(deadLetterQueue)
         .where(
           and(
-            gte(deadLetterQueue.failedAt, startTime.toISOString()),
-            lte(deadLetterQueue.failedAt, endTime.toISOString())
+            gte(deadLetterQueue.failedAt, startTime),
+            lte(deadLetterQueue.failedAt, endTime)
           )
         );
 
@@ -209,8 +209,8 @@ export async function getPerformanceTrend(
   endDate: Date
 ): Promise<PerformanceTrend[]> {
   const whereConditions = [
-    gte(performanceMetrics.timestamp, startDate.toISOString()),
-    lte(performanceMetrics.timestamp, endDate.toISOString()),
+    gte(performanceMetrics.timestamp, startDate),
+    lte(performanceMetrics.timestamp, endDate),
   ];
 
   if (licenseKey === null) {
@@ -414,7 +414,7 @@ function linearRegression(data: { x: number; y: number }[]) {
 export async function cleanupOldMetrics(retentionDays: number = 90) {
   const cutoffDate = new Date(
     Date.now() - retentionDays * 24 * 60 * 60 * 1000
-  ).toISOString();
+  );
 
   const deleted = await db
     .delete(performanceMetrics)

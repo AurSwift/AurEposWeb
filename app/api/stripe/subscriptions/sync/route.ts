@@ -197,7 +197,6 @@ export async function POST(request: NextRequest) {
     const PLAN_CODES: Record<string, string> = {
       basic: "BAS",
       professional: "PRO",
-      enterprise: "ENT",
     };
 
     // Check for existing license key
@@ -239,7 +238,7 @@ export async function POST(request: NextRequest) {
       // Generate NEW license if:
       // - No previous license exists
       // - Previous license was revoked
-      // - Plan TIER changed (BAS → PRO, PRO → ENT, etc.)
+      // - Plan TIER changed (BAS → PRO, etc.)
 
       // Deactivate old license if plan tier changed
       if (existingLicense && planTierChanged) {
