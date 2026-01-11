@@ -8,6 +8,7 @@
 ## System Overview
 
 The AuraSwift API implements a dual hybrid architecture combining:
+
 - **Direct API routes** for user-initiated, synchronous operations
 - **Webhook routes** for Stripe-initiated, asynchronous event processing
 - **Real-time event streaming** via Server-Sent Events (SSE) for desktop app synchronization
@@ -235,6 +236,7 @@ The AuraSwift API implements a dual hybrid architecture combining:
 ```
 
 **Characteristics:**
+
 - Synchronous flow
 - Immediate user feedback (~250ms)
 - Database updated immediately
@@ -307,6 +309,7 @@ The AuraSwift API implements a dual hybrid architecture combining:
 ```
 
 **Characteristics:**
+
 - Asynchronous flow
 - Background processing (1-5 second delay acceptable)
 - Idempotency via `webhookEvents` table
@@ -377,6 +380,7 @@ The AuraSwift API implements a dual hybrid architecture combining:
 ```
 
 **Characteristics:**
+
 - Persistent connection
 - Real-time event delivery (< 100ms)
 - Redis pub/sub for multi-instance support
@@ -570,6 +574,7 @@ The AuraSwift API implements a dual hybrid architecture combining:
 ### Direct API Routes (User-Initiated)
 
 **Error Flow:**
+
 1. Error caught in route handler
 2. Error logged with context
 3. User-friendly error message returned
@@ -577,6 +582,7 @@ The AuraSwift API implements a dual hybrid architecture combining:
 5. User sees error immediately
 
 **Example:**
+
 ```typescript
 try {
   await stripe.subscriptions.cancel(id);
@@ -590,6 +596,7 @@ try {
 ### Webhook Routes (Stripe-Initiated)
 
 **Error Flow:**
+
 1. Error caught in webhook handler
 2. Error logged with event details
 3. Event marked as failed in `webhookEvents` table
@@ -598,6 +605,7 @@ try {
 6. Stripe automatically retries (with exponential backoff)
 
 **Example:**
+
 ```typescript
 try {
   await handleSubscriptionUpdated(subscription);
@@ -606,7 +614,7 @@ try {
 } catch (error) {
   const shouldRetry = shouldRetryError(error);
   await logWebhookError(event.id, error, shouldRetry);
-  
+
   if (shouldRetry) {
     return NextResponse.json(
       { error: "Webhook processing failed" },
@@ -623,6 +631,7 @@ try {
 ### SSE Routes (Real-Time Streaming)
 
 **Error Flow:**
+
 1. Connection errors handled gracefully
 2. Client automatically reconnects
 3. Missed events fetched on reconnection
@@ -638,6 +647,7 @@ try {
 **Purpose:** Track which events were successfully processed by desktop apps
 
 **Flow:**
+
 1. Event published to Redis → SSE endpoint
 2. Desktop app receives event via SSE
 3. Desktop app processes event
@@ -650,12 +660,14 @@ try {
 **Purpose:** Handle events that failed after maximum retry attempts
 
 **Operations:**
+
 - `GET /api/dlq` - List DLQ items
 - `GET /api/dlq?stats=true` - Get DLQ statistics
 - `POST /api/dlq/retry/[eventId]` - Retry failed event
 - `POST /api/dlq/resolve/[eventId]` - Mark as resolved
 
 **DLQ Population:**
+
 - Webhook processing failures (after max retries)
 - SSE delivery failures (after max attempts)
 - Desktop processing failures (acknowledged with `status: "failed"`)
@@ -663,11 +675,13 @@ try {
 ### Retry Mechanism
 
 **Automatic Retries:**
+
 - Stripe webhook retries (automatic, exponential backoff)
 - Cron job retry processing: `/cron/retry-events`
 - SSE event retry via missed events endpoint
 
 **Manual Retries:**
+
 - DLQ retry endpoint
 - Webhook replay endpoint: `/stripe/webhooks/replay`
 
@@ -678,11 +692,13 @@ try {
 ### Health Monitoring
 
 **Endpoints:**
+
 - `GET /api/monitoring/health` - System health status
 - `GET /api/monitoring/event-durability` - Event durability metrics
 - `GET /api/health/sse` - SSE connection health
 
 **Metrics Tracked:**
+
 - Webhook processing success rate
 - Event acknowledgment rate
 - DLQ size and age
@@ -692,6 +708,7 @@ try {
 ### Scheduled Health Checks
 
 **Cron Jobs:**
+
 - `/cron/health-monitoring` - System health monitoring
 - `/cron/detect-stale-sessions` - Detect stale SSE connections
 - `/cron/cleanup-events` - Clean up old events

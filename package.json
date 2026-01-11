@@ -13,7 +13,6 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed-permissions": "tsx -r dotenv/config scripts/seed-permissions.ts dotenv_config_path=.env.local",
     "db:cleanup": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local",
     "db:cleanup:dry-run": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local --dry-run",
     "db:count": "tsx -r dotenv/config scripts/db/count-db-records.ts dotenv_config_path=.env.local",
