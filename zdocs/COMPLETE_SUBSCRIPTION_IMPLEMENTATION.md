@@ -19,7 +19,7 @@
 
 This plan implements a complete subscription flow where:
 1. Customer registers account
-2. Selects plan (Basic/Professional/Enterprise)
+2. Selects plan (Basic/Professional)
 3. Chooses billing cycle (Monthly/Annual with 20% discount)
 4. Redirects to Stripe Checkout
 5. Stripe processes payment
@@ -48,9 +48,6 @@ This plan implements a complete subscription flow where:
    - Product: "Professional Plan"
      - Price: $99/month (recurring)
      - Price: $950/year (recurring, 20% discount)
-   - Product: "Enterprise Plan"
-     - Price: $299/month (recurring)
-     - Price: $2,870/year (recurring, 20% discount)
 4. Copy Price IDs to environment variables
 
 ### 2. Environment Variables
@@ -67,8 +64,6 @@ STRIPE_PRICE_ID_BASIC_MONTHLY=price_...
 STRIPE_PRICE_ID_BASIC_ANNUAL=price_...
 STRIPE_PRICE_ID_PRO_MONTHLY=price_...
 STRIPE_PRICE_ID_PRO_ANNUAL=price_...
-STRIPE_PRICE_ID_ENTERPRISE_MONTHLY=price_...
-STRIPE_PRICE_ID_ENTERPRISE_ANNUAL=price_...
 ```
 
 ### 3. Install Dependencies
@@ -350,7 +345,7 @@ User Action                    Server Action                    Database
 ┌─────────────────────────────────────┐
 │  Choose Your Plan                    │
 ├─────────────────────────────────────┤
-│  [Basic]    [Professional★] [Enterprise]
+│  [Basic]    [Professional★]
 │  $49/mo     $99/mo        $299/mo  │
 │                                     │
 │  Features:                          │
@@ -698,19 +693,19 @@ AuraSwift handles subscription changes with **automatic proration** following St
    ) VALUES (
      'sub_def456',
      'cust_uvw456',
-     'plan_downgrade',
-     'enterprise',
+     'plan_upgrade',
+     'basic',
      'professional',
-     '299.00',
+     '49.00',
      '99.00',
-     '-180.26',  -- Negative = credit
+     '42.10',  -- Positive = charge
      '2026-01-06',
-     'Plan changed from enterprise to professional'
+     'Plan changed from basic to professional'
    );
    
    -- Update license key terminal limits
    UPDATE license_keys SET
-     max_terminals = 5  -- Was -1 (unlimited), now 5
+     max_terminals = 5  -- Was 1, now 5
    WHERE subscription_id = 'sub_def456';
    ```
 
@@ -754,7 +749,7 @@ AuraSwift handles subscription changes with **automatic proration** following St
 POST /api/subscriptions/preview-change
 Request: {
   subscriptionId: string,
-  newPlanId: "basic" | "professional" | "enterprise",
+  newPlanId: "basic" | "professional",
   newBillingCycle?: "monthly" | "annual"
 }
 
@@ -781,7 +776,7 @@ Response: {
 POST /api/subscriptions/change-plan
 Request: {
   subscriptionId: string,
-  newPlanId: "basic" | "professional" | "enterprise",
+  newPlanId: "basic" | "professional",
   newBillingCycle?: "monthly" | "annual"
 }
 
@@ -866,7 +861,7 @@ curl -X POST http://localhost:3000/api/subscriptions/change-plan \
 curl -X POST http://localhost:3000/api/stripe/checkout \
   -H "Content-Type: application/json" \
   -d '{
-    "planId": "enterprise",
+    "planId": "professional",
     "billingCycle": "monthly"
   }'
 
