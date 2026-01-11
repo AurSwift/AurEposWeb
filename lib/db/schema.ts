@@ -11,6 +11,7 @@ import {
   text,
   primaryKey,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -1063,14 +1064,20 @@ export const terminalSessions = pgTable(
       table.licenseKey,
       table.connectionStatus
     ),
-    // Unique constraint: one session per machine per license
-    machineLicenseUniqueIdx: index("terminal_sessions_machine_license_idx").on(
+    // Unique constraint: one session per machine per license (enforced)
+    machineLicenseUnique: unique("terminal_sessions_machine_license_unique").on(
       table.machineIdHash,
       table.licenseKey
     ),
     // Index for finding stale sessions
     lastHeartbeatIdx: index("terminal_sessions_last_heartbeat_idx").on(
       table.lastHeartbeatAt
+    ),
+    // Optimized index for upsert operations
+    upsertLookupIdx: index("terminal_sessions_upsert_lookup_idx").on(
+      table.licenseKey,
+      table.machineIdHash,
+      table.lastConnectedAt
     ),
   })
 );

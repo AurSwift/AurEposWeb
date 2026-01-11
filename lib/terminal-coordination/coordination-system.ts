@@ -36,46 +36,16 @@ export interface TerminalInfo {
 /**
  * Register Terminal Session
  * Called when a desktop terminal connects
+ * Uses upsert pattern to prevent duplicates
  */
 export async function registerTerminalSession(
   licenseKey: string,
   terminalInfo: TerminalInfo
 ): Promise<string> {
-  // Check if session already exists
-  const existing = await db
-    .select()
-    .from(terminalSessions)
-    .where(
-      and(
-        eq(terminalSessions.licenseKey, licenseKey),
-        eq(terminalSessions.machineIdHash, terminalInfo.machineIdHash)
-      )
-    )
-    .limit(1);
+  const now = new Date();
 
-  if (existing.length > 0) {
-    // Update existing session
-    await db
-      .update(terminalSessions)
-      .set({
-        connectionStatus: "connected",
-        lastConnectedAt: new Date(),
-        lastHeartbeatAt: new Date(),
-        appVersion: terminalInfo.appVersion,
-        metadata: terminalInfo.metadata,
-      })
-      .where(eq(terminalSessions.id, existing[0].id));
-
-    // Publish terminal reconnected event
-    publishGenericEvent(licenseKey, "terminal_reconnected", {
-      machineIdHash: terminalInfo.machineIdHash,
-      terminalName: existing[0].terminalName,
-    });
-
-    return existing[0].id;
-  }
-
-  // Get active terminal count for this license
+  // First check if we need to determine isPrimary status
+  // (only for new sessions when no active terminals exist)
   const activeTerminals = await db
     .select({ count: sql<number>`count(*)` })
     .from(terminalSessions)
@@ -88,8 +58,8 @@ export async function registerTerminalSession(
 
   const isFirstTerminal = Number(activeTerminals[0]?.count || 0) === 0;
 
-  // Create new terminal session
-  const newSession: NewTerminalSession = {
+  // Prepare session data
+  const sessionData: NewTerminalSession = {
     licenseKey,
     machineIdHash: terminalInfo.machineIdHash,
     terminalName: terminalInfo.terminalName,
@@ -101,19 +71,44 @@ export async function registerTerminalSession(
     metadata: terminalInfo.metadata,
   };
 
+  // Use INSERT ... ON CONFLICT for atomic upsert
+  // This prevents race conditions and duplicate entries
   const result = await db
     .insert(terminalSessions)
-    .values(newSession)
+    .values(sessionData)
+    .onConflictDoUpdate({
+      target: [terminalSessions.machineIdHash, terminalSessions.licenseKey],
+      set: {
+        connectionStatus: "connected",
+        lastConnectedAt: now,
+        lastHeartbeatAt: now,
+        appVersion: terminalInfo.appVersion,
+        hostname: terminalInfo.hostname,
+        ipAddress: terminalInfo.ipAddress,
+        metadata: terminalInfo.metadata,
+        // Don't update terminalName, firstConnectedAt, or isPrimary on reconnection
+      },
+    })
     .returning();
 
-  // Publish terminal added event
-  publishGenericEvent(licenseKey, "terminal_added", {
-    machineIdHash: terminalInfo.machineIdHash,
-    terminalName: terminalInfo.terminalName,
-    isPrimary: isFirstTerminal,
-  });
+  const session = result[0];
+  const isReconnection = session.firstConnectedAt < now;
 
-  return result[0].id;
+  // Publish appropriate event
+  if (isReconnection) {
+    publishGenericEvent(licenseKey, "terminal_reconnected", {
+      machineIdHash: terminalInfo.machineIdHash,
+      terminalName: session.terminalName,
+    });
+  } else {
+    publishGenericEvent(licenseKey, "terminal_added", {
+      machineIdHash: terminalInfo.machineIdHash,
+      terminalName: terminalInfo.terminalName,
+      isPrimary: isFirstTerminal,
+    });
+  }
+
+  return session.id;
 }
 
 /**

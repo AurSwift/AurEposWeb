@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
         trial_period_days: trialPeriodDays,
       },
       allow_promotion_codes: true, // Allow discount codes
+      billing_address_collection: "required", // Require billing address
     });
 
     return NextResponse.json({
