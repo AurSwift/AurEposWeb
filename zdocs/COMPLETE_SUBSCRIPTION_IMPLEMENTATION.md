@@ -1,4 +1,5 @@
 # Complete Subscription Flow Implementation Plan
+
 ## Customer Registration → Plan Selection → Billing Cycle → Stripe → Dashboard
 
 ---
@@ -18,6 +19,7 @@
 ## 🎯 Overview
 
 This plan implements a complete subscription flow where:
+
 1. Customer registers account
 2. Selects plan (Basic/Professional)
 3. Chooses billing cycle (Monthly/Annual with 20% discount)
@@ -27,6 +29,7 @@ This plan implements a complete subscription flow where:
 7. Customer redirected to dashboard with license key
 
 **Business Rules Applied:**
+
 - License key format: `EPOS-{Plan}-V2-{Random}-{Checksum}`
 - Trial periods: 7 days (monthly), 14 days (annual)
 - Annual discount: 20%
@@ -53,6 +56,7 @@ This plan implements a complete subscription flow where:
 ### 2. Environment Variables
 
 Add to `.env.local`:
+
 ```env
 # Stripe Configuration
 STRIPE_SECRET_KEY=sk_test_...
@@ -100,6 +104,7 @@ export const subscriptions = pgTable("subscriptions", {
 ```
 
 **Migration:**
+
 ```bash
 pnpm db:generate
 pnpm db:push
@@ -143,23 +148,27 @@ web/
 ## 🚀 Implementation Phases
 
 ### Phase 1: Foundation (Setup)
+
 1. Install Stripe packages
 2. Update database schema
 3. Create Stripe client
 4. Create plan configuration
 
 ### Phase 2: Core Logic
+
 5. Create license key generator
 6. Create checkout session API
 7. Create webhook handler
 
 ### Phase 3: UI Components
+
 8. Update signup page (multi-step)
 9. Create plan selection UI
 10. Create billing cycle toggle
 11. Create success page
 
 ### Phase 4: Integration
+
 12. Connect signup → checkout
 13. Test webhook handling
 14. Verify license key generation
@@ -225,6 +234,7 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 **Path:** `app/signup/page.tsx`
 
 **Multi-step flow:**
+
 1. Step 1: Account creation (existing)
 2. Step 2: Plan selection (new)
 3. Step 3: Billing cycle selection (new)
@@ -237,6 +247,7 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 **Path:** `app/success/page.tsx`
 
 Displays:
+
 - Welcome message
 - License key (with copy button)
 - Download link
@@ -248,6 +259,7 @@ Displays:
 ## ✅ Implementation Checklist
 
 ### Setup Phase
+
 - [ ] Install Stripe packages
 - [ ] Add Stripe environment variables
 - [ ] Create Stripe products & prices
@@ -255,6 +267,7 @@ Displays:
 - [ ] Run migrations
 
 ### Core Implementation
+
 - [ ] Create `lib/stripe/client.ts`
 - [ ] Create `lib/stripe/plans.ts`
 - [ ] Create `lib/license/generator.ts`
@@ -262,12 +275,14 @@ Displays:
 - [ ] Create `app/api/stripe/webhook/route.ts`
 
 ### UI Implementation
+
 - [ ] Update `app/signup/page.tsx` (multi-step)
 - [ ] Create `components/pricing/plan-card.tsx`
 - [ ] Create `components/pricing/billing-toggle.tsx`
 - [ ] Create `app/success/page.tsx`
 
 ### Testing
+
 - [ ] Test account creation
 - [ ] Test plan selection
 - [ ] Test Stripe Checkout redirect
@@ -288,7 +303,7 @@ User Action                    Server Action                    Database
    ↓                         - Create user
    ↓                         - Create customer
    ↓                         - Link user ↔ customer
-   ↓                         
+   ↓
 3. Auto sign-in              NextAuth signIn
    ↓
 4. Select plan               (Client-side)
@@ -327,6 +342,7 @@ User Action                    Server Action                    Database
 ## 🎨 UI/UX Flow Details
 
 ### Step 1: Account Creation
+
 ```
 ┌─────────────────────────────────────┐
 │  Sign Up                            │
@@ -341,6 +357,7 @@ User Action                    Server Action                    Database
 ```
 
 ### Step 2: Plan Selection
+
 ```
 ┌─────────────────────────────────────┐
 │  Choose Your Plan                    │
@@ -357,6 +374,7 @@ User Action                    Server Action                    Database
 ```
 
 ### Step 3: Billing Cycle
+
 ```
 ┌─────────────────────────────────────┐
 │  Select Billing Cycle               │
@@ -372,6 +390,7 @@ User Action                    Server Action                    Database
 ```
 
 ### Step 4: Stripe Checkout
+
 ```
 ┌─────────────────────────────────────┐
 │  Stripe Checkout (External)         │
@@ -385,6 +404,7 @@ User Action                    Server Action                    Database
 ```
 
 ### Step 5: Success Page
+
 ```
 ┌─────────────────────────────────────┐
 │  Welcome to aurswift! ✅            │
@@ -421,16 +441,19 @@ User Action                    Server Action                    Database
 ## 📊 Error Handling
 
 ### Checkout Errors
+
 - Invalid plan ID → 400 Bad Request
 - Missing customer → 404 Not Found
 - Stripe API error → 500 Internal Server Error
 
 ### Webhook Errors
+
 - Invalid signature → 400 Bad Request
 - Missing metadata → Log and skip
 - Database error → Log and retry
 
 ### User-Facing Errors
+
 - Display clear error messages
 - Provide retry options
 - Log errors for debugging
@@ -440,16 +463,19 @@ User Action                    Server Action                    Database
 ## 🧪 Testing Strategy
 
 ### Unit Tests
+
 - License key generation
 - Plan price calculations
 - Checksum validation
 
 ### Integration Tests
+
 - Checkout session creation
 - Webhook event handling
 - Database record creation
 
 ### E2E Tests
+
 - Complete signup flow
 - Stripe Checkout redirect
 - Success page display
@@ -460,6 +486,7 @@ User Action                    Server Action                    Database
 ## 📈 Monitoring & Analytics
 
 ### Key Metrics to Track
+
 1. Signup conversion rate
 2. Plan selection distribution
 3. Billing cycle preference (monthly vs annual)
@@ -468,6 +495,7 @@ User Action                    Server Action                    Database
 6. Payment success/failure rates
 
 ### Logging
+
 - All subscription events
 - Webhook processing
 - License key generation
@@ -517,6 +545,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
 ### Scenario 1: Upgrade (Plan A → Plan B on Jan 4)
 
 **Timeline:**
+
 - **Jan 2, 2026**: Customer purchases Plan A (Basic - $49/month)
 - **Jan 4, 2026**: Customer upgrades to Plan B (Professional - $99/month)
 
@@ -532,17 +561,18 @@ Aurswift handles subscription changes with **automatic proration** following Str
    - Customer clicks "Upgrade to Professional" in dashboard
    - System calls `/api/subscriptions/preview-change` to show proration
    - Preview shows:
+
      ```
      Current Plan: Basic ($49/month)
      New Plan: Professional ($99/month)
-     
+
      Proration Charge: $46.45
      Calculation:
      - Days remaining: 29 days (Jan 4 - Feb 2)
      - Unused Basic credit: (29/31) × $49 = $45.81
      - Professional charge for 29 days: (29/31) × $99 = $92.26
      - Immediate charge: $92.26 - $45.81 = $46.45
-     
+
      Next billing: Feb 2, 2026 for $99.00
      ```
 
@@ -564,6 +594,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
    - Updates subscription to Professional plan
 
 5. **Database Updates (Transaction)**
+
    ```sql
    -- Update subscription record
    UPDATE subscriptions SET
@@ -571,7 +602,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
      price = '99.00',
      updated_at = NOW()
    WHERE id = 'sub_abc123';
-   
+
    -- Record change in audit trail
    INSERT INTO subscription_changes (
      subscription_id,
@@ -596,7 +627,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
      '2026-01-04',
      'Plan changed from basic to professional'
    );
-   
+
    -- Update license key terminal limits
    UPDATE license_keys SET
      max_terminals = 5
@@ -612,6 +643,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
    - Invoice for $46.45 proration charge attached
 
 **Result:**
+
 - ✅ Customer immediately gets Professional plan benefits
 - ✅ License key now allows 5 terminals (was 1)
 - ✅ Charged $46.45 for remaining 29 days
@@ -622,6 +654,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
 ### Scenario 2: Downgrade (Plan C → Plan B on Jan 6)
 
 **Timeline:**
+
 - **Jan 3, 2026**: Customer purchases Plan C (Enterprise - $299/month)
 - **Jan 6, 2026**: Customer downgrades to Plan B (Professional - $99/month)
 
@@ -637,17 +670,18 @@ Aurswift handles subscription changes with **automatic proration** following Str
    - Customer clicks "Change Plan" → selects Professional
    - System calls `/api/subscriptions/preview-change` to show impact
    - Preview shows:
+
      ```
      Current Plan: Enterprise ($299/month)
      New Plan: Professional ($99/month)
-     
+
      Credit Applied: $193.55
      Calculation:
      - Days remaining: 28 days (Jan 6 - Feb 3)
      - Unused Enterprise credit: (28/31) × $299 = $269.68
      - Professional charge for 28 days: (28/31) × $99 = $89.42
      - Credit to next invoice: $269.68 - $89.42 = $180.26
-     
+
      Effective immediately
      Next billing: Feb 3, 2026 for $99.00 (minus $180.26 credit)
      ```
@@ -670,6 +704,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
    - Immediately switches to Professional plan
 
 5. **Database Updates (Transaction)**
+
    ```sql
    -- Update subscription record
    UPDATE subscriptions SET
@@ -677,7 +712,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
      price = '99.00',
      updated_at = NOW()
    WHERE id = 'sub_def456';
-   
+
    -- Record change in audit trail
    INSERT INTO subscription_changes (
      subscription_id,
@@ -702,7 +737,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
      '2026-01-06',
      'Plan changed from basic to professional'
    );
-   
+
    -- Update license key terminal limits
    UPDATE license_keys SET
      max_terminals = 5  -- Was 1, now 5
@@ -719,6 +754,7 @@ Aurswift handles subscription changes with **automatic proration** following Str
    - Shows $180.26 credit will be applied to next invoice
 
 **Result:**
+
 - ✅ Customer immediately switched to Professional plan
 - ✅ License key now limits to 5 terminals (was unlimited)
 - ✅ $180.26 credit applied to account
@@ -729,22 +765,23 @@ Aurswift handles subscription changes with **automatic proration** following Str
 
 ### Best Practices Implemented
 
-| Practice | Implementation | Benefit |
-|----------|----------------|---------|
-| **Immediate Upgrades** | ✅ Applied instantly with proration charge | Better UX, instant access to features |
-| **Downgrade Credits** | ✅ Credit applied to next invoice | Fair billing, no immediate charge |
-| **Proration Calculation** | ✅ Automatic via Stripe | Accurate, no manual calculations |
-| **Preview Before Change** | ✅ `/api/subscriptions/preview-change` endpoint | Transparency, informed decisions |
-| **Audit Trail** | ✅ `subscription_changes` table | Compliance, support debugging |
-| **License Limit Updates** | ✅ Immediate terminal limit changes | Prevent over-usage, enforce tiers |
-| **SSE Notifications** | ✅ Real-time desktop app updates | Seamless desktop integration |
-| **Email Confirmations** | ✅ Automated notifications | Customer awareness, records |
+| Practice                  | Implementation                                  | Benefit                               |
+| ------------------------- | ----------------------------------------------- | ------------------------------------- |
+| **Immediate Upgrades**    | ✅ Applied instantly with proration charge      | Better UX, instant access to features |
+| **Downgrade Credits**     | ✅ Credit applied to next invoice               | Fair billing, no immediate charge     |
+| **Proration Calculation** | ✅ Automatic via Stripe                         | Accurate, no manual calculations      |
+| **Preview Before Change** | ✅ `/api/subscriptions/preview-change` endpoint | Transparency, informed decisions      |
+| **Audit Trail**           | ✅ `subscription_changes` table                 | Compliance, support debugging         |
+| **License Limit Updates** | ✅ Immediate terminal limit changes             | Prevent over-usage, enforce tiers     |
+| **SSE Notifications**     | ✅ Real-time desktop app updates                | Seamless desktop integration          |
+| **Email Confirmations**   | ✅ Automated notifications                      | Customer awareness, records           |
 
 ---
 
 ### API Endpoints Reference
 
 #### 1. Preview Subscription Change
+
 ```typescript
 POST /api/subscriptions/preview-change
 Request: {
@@ -772,6 +809,7 @@ Response: {
 ```
 
 #### 2. Execute Plan Change
+
 ```typescript
 POST /api/subscriptions/change-plan
 Request: {
@@ -797,9 +835,11 @@ Response: {
 ### UI Components
 
 #### Subscription History Display
+
 New component: `components/dashboard/subscription-history-card.tsx`
 
 Shows all past plan changes with:
+
 - Change type badge (Upgrade/Downgrade/Cancelled)
 - Date of change
 - Previous plan → New plan
@@ -807,16 +847,18 @@ Shows all past plan changes with:
 - Change reason
 
 **Usage:**
+
 ```tsx
 import { SubscriptionHistoryCard } from "@/components/dashboard/subscription-history-card";
 
 // Fetch subscription changes
-const changes = await db.select()
+const changes = await db
+  .select()
   .from(subscriptionChanges)
   .where(eq(subscriptionChanges.customerId, customerId))
   .orderBy(desc(subscriptionChanges.effectiveDate));
 
-<SubscriptionHistoryCard changes={changes} />
+<SubscriptionHistoryCard changes={changes} />;
 ```
 
 ---
@@ -824,6 +866,7 @@ const changes = await db.select()
 ### Testing the Scenarios
 
 #### Test Scenario 1 (Upgrade)
+
 ```bash
 # 1. Create subscription on Jan 2
 curl -X POST http://localhost:3000/api/stripe/checkout \
@@ -856,6 +899,7 @@ curl -X POST http://localhost:3000/api/subscriptions/change-plan \
 ```
 
 #### Test Scenario 2 (Downgrade)
+
 ```bash
 # 1. Create subscription on Jan 3
 curl -X POST http://localhost:3000/api/stripe/checkout \
@@ -889,6 +933,7 @@ curl -X POST http://localhost:3000/api/subscriptions/change-plan \
 ### Proration Formula Reference
 
 **Upgrade Proration:**
+
 ```
 Immediate Charge = (New Price - Old Price) × (Days Remaining / Days in Period)
 
@@ -899,6 +944,7 @@ Example (Jan 2 → Jan 4 upgrade):
 ```
 
 **Downgrade Proration:**
+
 ```
 Credit = (Old Price - New Price) × (Days Remaining / Days in Period)
 

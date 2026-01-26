@@ -57,7 +57,6 @@ For best practices, store plan features in Stripe product metadata. This makes S
 Each product must have **exactly 2 prices**:
 
 1. **Monthly Price**:
-
    - Recurring interval: `month`
    - Price amount: Set in cents (e.g., $49/month = 4900 cents)
 

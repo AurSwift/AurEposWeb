@@ -165,8 +165,8 @@ async function fetchPlansFromEnvPriceIds(): Promise<Record<PlanId, Plan>> {
   if (missingPlans.length > 0) {
     throw new Error(
       `Missing required plans: ${missingPlans.join(
-        ", "
-      )}. Check your environment variables.`
+        ", ",
+      )}. Check your environment variables.`,
     );
   }
 
@@ -203,7 +203,7 @@ async function fetchPlansFromStripe(): Promise<Record<PlanId, Plan>> {
       const planId = product.metadata?.planId as PlanId | undefined;
       if (!planId || !isValidPlanId(planId)) {
         console.warn(
-          `Product ${product.id} missing or invalid planId metadata`
+          `Product ${product.id} missing or invalid planId metadata`,
         );
         continue;
       }
@@ -232,7 +232,7 @@ async function fetchPlansFromStripe(): Promise<Record<PlanId, Plan>> {
       // Skip if we don't have both prices
       if (!monthlyPrice || !annualPrice) {
         console.warn(
-          `Product ${product.id} (${planId}) missing monthly or annual price`
+          `Product ${product.id} (${planId}) missing monthly or annual price`,
         );
         continue;
       }
@@ -274,8 +274,8 @@ async function fetchPlansFromStripe(): Promise<Record<PlanId, Plan>> {
     if (missingPlans.length > 0) {
       console.warn(
         `Missing required plans in Stripe (metadata method): ${missingPlans.join(
-          ", "
-        )}`
+          ", ",
+        )}`,
       );
       console.log("Attempting fallback to environment variable Price IDs...");
       // Fall through to fallback method
@@ -308,7 +308,7 @@ async function fetchPlansFromStripe(): Promise<Record<PlanId, Plan>> {
 
       // Last resort: throw error
       throw new Error(
-        "Failed to fetch plans from Stripe. Please check your Stripe products have metadata.planId set, or ensure Price IDs are set in environment variables."
+        "Failed to fetch plans from Stripe. Please check your Stripe products have metadata.planId set, or ensure Price IDs are set in environment variables.",
       );
     }
   }
@@ -347,7 +347,7 @@ export async function getPlan(planId: PlanId): Promise<Plan> {
  */
 export async function getPrice(
   planId: PlanId,
-  cycle: BillingCycle
+  cycle: BillingCycle,
 ): Promise<number> {
   const plan = await getPlan(planId);
   return cycle === "monthly" ? plan.priceMonthly : plan.priceAnnual;
@@ -358,7 +358,7 @@ export async function getPrice(
  */
 export async function getStripePriceId(
   planId: PlanId,
-  cycle: BillingCycle
+  cycle: BillingCycle,
 ): Promise<string> {
   const plan = await getPlan(planId);
   const priceId =

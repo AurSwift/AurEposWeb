@@ -2,7 +2,7 @@
  * Migration script to update old license keys to new format
  * Old format: AURA-XXXXXX-XXXXXX-XXXXXX
  * New format: AUR-{PLAN}-V2-{8chars}-{checksum}
- * 
+ *
  * Run with: pnpm tsx scripts/migrate-license-keys.ts
  */
 
@@ -25,7 +25,10 @@ async function migrateLicenseKeys() {
 
     for (const license of allLicenses) {
       // Check if it's old format (starts with AURA- not AUR-)
-      if (license.licenseKey.startsWith("AURA-") && !license.licenseKey.includes("-V2-")) {
+      if (
+        license.licenseKey.startsWith("AURA-") &&
+        !license.licenseKey.includes("-V2-")
+      ) {
         console.log(`❌ Old format: ${license.licenseKey}`);
 
         // Get subscription to determine plan
@@ -72,7 +75,9 @@ async function migrateLicenseKeys() {
       }
     }
 
-    console.log(`\n✅ Migration complete! Updated ${updatedCount} license keys.\n`);
+    console.log(
+      `\n✅ Migration complete! Updated ${updatedCount} license keys.\n`,
+    );
   } catch (error) {
     console.error("❌ Migration failed:", error);
     process.exit(1);
