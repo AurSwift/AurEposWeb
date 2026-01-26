@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit --pretty",
     "typecheck:watch": "tsc --noEmit --watch --pretty",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx -r dotenv/config scripts/db/run-migrations.ts dotenv_config_path=.env.local",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:cleanup": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local",

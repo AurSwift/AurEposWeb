@@ -783,7 +783,7 @@ function generateLicenseDeactivatedTemplate(data: {
           <tr>
             <td style="padding: 30px 40px; background-color: #f8f9fa; border-top: 1px solid #e9ecef; border-radius: 0 0 8px 8px;">
               <p style="margin: 0; color: #999; font-size: 12px; line-height: 1.6; text-align: center;">
-                Questions? Contact support@auraswift.com
+                Questions? Contact support@aurswift.com
               </p>
             </td>
           </tr>
@@ -983,6 +983,6 @@ Reactivate My Subscription: ${reactivateUrl}
 
 If you believe this is an error or need assistance, please contact our support team immediately.
 
-Questions? Contact support@auraswift.com
+Questions? Contact support@aurswift.com
 `;
 }

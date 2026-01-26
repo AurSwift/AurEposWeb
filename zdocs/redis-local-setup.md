@@ -2,7 +2,7 @@
 
 ## Overview
 
-Redis is configured and running locally for the AuraSwift application. This guide covers management, monitoring, and troubleshooting.
+Redis is configured and running locally for the Aurswift application. This guide covers management, monitoring, and troubleshooting.
 
 ## ✅ Installation Complete
 
@@ -50,7 +50,7 @@ redis-cli info
 
 ```bash
 # Navigate to web directory
-cd /Users/admin/Documents/Developer/FullStackDev/AuraSwift/web
+cd /Users/admin/Documents/Developer/FullStackDev/Aurswift/web
 
 # Run the Redis connection test
 npm run redis:test
@@ -182,7 +182,7 @@ redis-cli config set maxmemory-policy allkeys-lru
 
 ## 🏗️ Architecture
 
-### How AuraSwift Uses Redis
+### How Aurswift Uses Redis
 
 1. **Pub/Sub for Real-time Events**
 

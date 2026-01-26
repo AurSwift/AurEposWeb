@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a **comprehensive, detailed explanation** of how license keys are generated, how machine fingerprints are linked to license keys, and the complete activation and validation flows in the AuraSwift EPOS system.
+This document provides a **comprehensive, detailed explanation** of how license keys are generated, how machine fingerprints are linked to license keys, and the complete activation and validation flows in the Aurswift EPOS system.
 
 ## Table of Contents
 
@@ -194,7 +194,7 @@ export function generateLicenseKey(planId: PlanId, customerId: string): string {
 
 | Part      | Value      | Purpose                                        |
 | --------- | ---------- | ---------------------------------------------- |
-| Prefix    | `AUR`      | Fixed prefix (AuraSwift)                       |
+| Prefix    | `AUR`      | Fixed prefix (Aurswift)                        |
 | Plan Code | `PRO`      | BAS/PRO/ENT (plan tier)                        |
 | Version   | `V2`       | License format version                         |
 | Random    | `7A83B2D4` | Unique identifier (8 chars)                    |
@@ -349,7 +349,7 @@ Customer **copies** license key: `AUR-PRO-V2-7A83B2D4-1F2E3D4C`
 
 ### Phase 2: Customer Opens Desktop App (DESKTOP)
 
-**Step 2.1**: Customer opens AuraSwift desktop app on Windows PC
+**Step 2.1**: Customer opens Aurswift desktop app on Windows PC
 
 **Step 2.2**: App shows license activation screen
 
@@ -382,7 +382,7 @@ const payload = {
 };
 
 // Send POST request
-const response = await fetch("https://auraswift.io/api/license/activate", {
+const response = await fetch("https://Aurswift.io/api/license/activate", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(payload),
@@ -664,7 +664,7 @@ await storeLocalActivation({
 initializeSSE(
   "AUR-PRO-V2-7A83B2D4-1F2E3D4C",
   "MF2-a1b2c3d4e5f6...",
-  "https://auraswift.io"
+  "https://Aurswift.io"
 );
 ```
 

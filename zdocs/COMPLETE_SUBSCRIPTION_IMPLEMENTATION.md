@@ -510,7 +510,7 @@ User Action                    Server Action                    Database
 
 ### Overview
 
-AuraSwift handles subscription changes with **automatic proration** following Stripe best practices. When customers upgrade or downgrade their plans, the system calculates the difference in cost for the remaining billing period and either charges the customer immediately (upgrade) or applies a credit to the next invoice (downgrade).
+Aurswift handles subscription changes with **automatic proration** following Stripe best practices. When customers upgrade or downgrade their plans, the system calculates the difference in cost for the remaining billing period and either charges the customer immediately (upgrade) or applies a credit to the next invoice (downgrade).
 
 ---
 

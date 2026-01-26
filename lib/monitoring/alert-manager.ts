@@ -139,7 +139,7 @@ async function sendSlackAlert(
               short: true,
             })),
           ],
-          footer: "AuraSwift Monitoring",
+          footer: "AurSwift Monitoring",
           ts: Math.floor(alert.timestamp.getTime() / 1000),
         },
       ],
@@ -209,7 +209,7 @@ async function sendDiscordAlert(
             })),
           ],
           footer: {
-            text: "AuraSwift Monitoring",
+            text: "AurSwift Monitoring",
           },
           timestamp: alert.timestamp.toISOString(),
         },

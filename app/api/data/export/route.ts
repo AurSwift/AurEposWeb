@@ -280,7 +280,7 @@ export async function GET(_request: NextRequest) {
 
     if (format === "file") {
       // Return as downloadable JSON file
-      const fileName = `auraswift-data-export-${user.id}-${
+      const fileName = `aurswift-data-export-${user.id}-${
         new Date().toISOString().split("T")[0]
       }.json`;
 

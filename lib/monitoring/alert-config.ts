@@ -101,7 +101,7 @@ export const ALERT_CHANNELS: Record<string, AlertChannel> = {
     enabled: !!process.env.ALERT_EMAIL_TO,
     config: {
       to: process.env.ALERT_EMAIL_TO,
-      from: process.env.ALERT_EMAIL_FROM || "alerts@auraswift.com",
+      from: process.env.ALERT_EMAIL_FROM || "alerts@aurswift.com",
     },
   },
 };

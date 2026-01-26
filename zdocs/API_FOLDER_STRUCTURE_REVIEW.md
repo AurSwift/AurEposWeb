@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document describes the API folder structure for the AuraSwift web application. The API follows a dual hybrid architecture pattern combining Direct API routes (user-initiated) with Webhook routes (Stripe-initiated) for subscription management.
+This document describes the API folder structure for the Aurswift web application. The API follows a dual hybrid architecture pattern combining Direct API routes (user-initiated) with Webhook routes (Stripe-initiated) for subscription management.
 
 ---
 
@@ -136,6 +136,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** User authentication and account management
 
 **Routes:**
+
 - `POST /api/auth/signup` - Create new user account
 - `POST /api/auth/[...nextauth]` - NextAuth.js authentication endpoints
 - `POST /api/auth/forgot-password` - Request password reset
@@ -152,6 +153,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Direct Stripe API operations and webhook handling
 
 **Organization:**
+
 - **`checkout/`** - Checkout session creation
 - **`subscriptions/`** - Subscription synchronization
 - **`sync/`** - General Stripe data sync (payment methods, invoices)
@@ -159,6 +161,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 - **`billing/`** - Billing portal and payment method management
 
 **Direct API Routes (User-Initiated):**
+
 - `POST /api/stripe/checkout/create` - Create Stripe checkout session
 - `POST /api/stripe/subscriptions` - Sync subscription from Stripe
 - `POST /api/stripe/sync` - Sync payment methods and invoices from Stripe
@@ -166,10 +169,12 @@ This document describes the API folder structure for the AuraSwift web applicati
 - `GET /api/stripe/billing/payment-method` - Get payment methods
 
 **Webhook Routes (Stripe-Initiated):**
+
 - `POST /api/stripe/webhooks/handler` - Main webhook handler for Stripe events
 - `POST /api/stripe/webhooks/replay` - Replay webhook events
 
 **Supported Webhook Events:**
+
 - `checkout.session.completed` - Creates subscription
 - `customer.subscription.updated` - Updates subscription
 - `customer.subscription.deleted` - Cancels subscription
@@ -189,6 +194,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** User-controlled subscription operations
 
 **Routes:**
+
 - `POST /api/subscriptions/cancel` - Cancel subscription immediately
 - `POST /api/subscriptions/reactivate` - Reactivate cancelled subscription
 - `POST /api/subscriptions/change-plan` - Change plan or billing cycle
@@ -207,6 +213,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Desktop application license operations
 
 **Routes:**
+
 - `POST /api/license/activate` - Activate license on machine
 - `POST /api/license/deactivate` - Deactivate license
 - `POST /api/license/validate` - Validate license status
@@ -222,6 +229,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Server-Sent Events (SSE) for real-time desktop app notifications
 
 **Routes:**
+
 - `GET /api/events/[licenseKey]` - SSE stream for subscription events
 - `GET /api/events/[licenseKey]/missed` - Fetch missed events
 - `POST /api/events/acknowledge` - Acknowledge event processing
@@ -236,6 +244,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Administrative operations (admin-only)
 
 **Routes:**
+
 - `GET /api/admin/customers` - List all customers
 - `GET /api/admin/stats` - System statistics
 - `POST /api/admin/licenses/[licenseId]/revoke` - Revoke license
@@ -250,6 +259,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Usage analytics and reporting
 
 **Routes:**
+
 - `GET /api/analytics/health` - Health analytics
 - `GET /api/analytics/patterns` - Usage patterns
 - `GET /api/analytics/trends` - Usage trends
@@ -261,6 +271,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Management of failed events that require manual intervention
 
 **Routes:**
+
 - `GET /api/dlq` - List DLQ items (with optional status filter)
 - `GET /api/dlq?stats=true` - Get DLQ statistics
 - `POST /api/dlq/retry/[eventId]` - Retry failed event
@@ -275,6 +286,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Background jobs executed on a schedule (Vercel Cron)
 
 **Routes:**
+
 - `GET /api/cron/analytics` - Process analytics data
 - `GET /api/cron/cleanup-events` - Clean up old events
 - `GET /api/cron/detect-stale-sessions` - Detect stale SSE connections
@@ -292,6 +304,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** System health and performance monitoring
 
 **Routes:**
+
 - `GET /api/monitoring/event-durability` - Event durability metrics
 - `GET /api/monitoring/health` - System health status
 
@@ -302,6 +315,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 **Purpose:** Terminal device management
 
 **Routes:**
+
 - `GET /api/terminals` - Get all terminals for user
 - `POST /api/terminals/broadcast` - Broadcast message to terminals
 - `POST /api/terminals/sync` - Sync terminal data
@@ -311,34 +325,44 @@ This document describes the API folder structure for the AuraSwift web applicati
 ### Other Routes
 
 **Payments:**
+
 - `GET /api/payments/history` - Payment history
 
 **Invoices:**
+
 - `GET /api/invoices/history` - Invoice history
 
 **User Profile:**
+
 - `GET /api/profile` - Get user profile
 - `PUT /api/profile` - Update user profile
 
 **User Information:**
+
 - `GET /api/user` - Get user details
 
 **Support:**
+
 - `POST /api/support` - Submit support ticket
 
 **Data Export:**
+
 - `GET /api/data/export` - Export user data (GDPR compliance)
 
 **Releases:**
+
 - `GET /api/releases/latest` - Get latest release information
 
 **Terminal Sessions:**
+
 - `GET /api/terminal-sessions` - Get terminal session data
 
 **Health Checks:**
+
 - `GET /api/health/sse` - SSE health check
 
 **Testing:**
+
 - `GET /api/test/sse-status` - Test SSE connection status
 - `POST /api/test/trigger-revoke` - Test license revocation trigger
 
@@ -351,6 +375,7 @@ This document describes the API folder structure for the AuraSwift web applicati
 The API implements a dual hybrid architecture:
 
 1. **Direct API Routes** (User-initiated, synchronous)
+
    - User actions trigger immediate Stripe API calls
    - Database updated immediately
    - Response returned to user (~250ms)
@@ -365,6 +390,7 @@ The API implements a dual hybrid architecture:
 ### Event Distribution Pattern
 
 **Real-time sync via SSE:**
+
 - Both webhook events and direct API actions publish to Redis
 - SSE endpoint (`/events/[licenseKey]`) streams events to desktop apps
 - Desktop apps acknowledge events via `/events/acknowledge`
@@ -419,11 +445,13 @@ The API routes interact with the following main database tables:
 ## Error Handling
 
 **Direct API Routes:**
+
 - Errors caught and returned as user-friendly messages
 - HTTP status codes: 400 (validation), 404 (not found), 500 (server error)
 - Errors logged for debugging
 
 **Webhook Routes:**
+
 - Errors marked in `webhookEvents` table
 - Return 500 status to trigger Stripe retry
 - Failed events enter Dead Letter Queue after max retries
@@ -435,6 +463,7 @@ The API routes interact with the following main database tables:
 All API routes use consistent response helpers:
 
 **Success Response:**
+
 ```typescript
 {
   success: true,
@@ -443,6 +472,7 @@ All API routes use consistent response helpers:
 ```
 
 **Error Response:**
+
 ```typescript
 {
   success: false,

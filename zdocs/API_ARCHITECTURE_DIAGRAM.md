@@ -7,7 +7,7 @@
 
 ## System Overview
 
-The AuraSwift API implements a dual hybrid architecture combining:
+The Aurswift API implements a dual hybrid architecture combining:
 
 - **Direct API routes** for user-initiated, synchronous operations
 - **Webhook routes** for Stripe-initiated, asynchronous event processing
@@ -744,7 +744,7 @@ try {
 
 ## Conclusion
 
-The AuraSwift API architecture provides:
+The Aurswift API architecture provides:
 
 1. **Clear separation** between user actions and automatic events
 2. **Dual hybrid approach** for optimal performance and reliability

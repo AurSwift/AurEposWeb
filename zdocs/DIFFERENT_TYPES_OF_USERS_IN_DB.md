@@ -1,6 +1,6 @@
 # Database Tables: Users, Accounts, Customers, and Employees
 
-This document explains the four core tables in the AuraSwift EPOS platform database: `users`, `accounts`, `customers`, and `employees`. It covers their structure, relationships, and how they work together to support both customer-facing and internal operations.
+This document explains the four core tables in the Aurswift EPOS platform database: `users`, `accounts`, `customers`, and `employees`. It covers their structure, relationships, and how they work together to support both customer-facing and internal operations.
 
 ## Table Overview
 
@@ -24,6 +24,7 @@ The application uses a **role-based access control (RBAC)** system where a singl
 ## 1. Users Table
 
 ### Purpose
+
 Core authentication table for NextAuth.js. All users in the system (customers, employees, admins) must have a record in this table.
 
 ### Schema
@@ -82,6 +83,7 @@ export const users = pgTable("users", {
 ## 2. Accounts Table
 
 ### Purpose
+
 Stores OAuth provider connections for NextAuth.js. Allows users to sign in via Google, GitHub, etc., in addition to email/password.
 
 ### Schema
@@ -130,6 +132,7 @@ export const accounts = pgTable("accounts", {
 ## 3. Customers Table
 
 ### Purpose
+
 Stores business information for EPOS platform customers. Contains billing details, subscription data, and Stripe integration fields. Only users with `role = "customer"` have records here.
 
 ### Schema
@@ -221,6 +224,7 @@ const customer = await db.query.customers.findFirst({
 ## 4. Employees Table
 
 ### Purpose
+
 Stores additional information for internal staff members (admins, support, developers). Only users with `role = "admin" | "support" | "developer"` have records here.
 
 ### Schema
@@ -275,10 +279,7 @@ export const employees = pgTable("employees", {
 ```typescript
 // Get all active employees in support department
 const supportStaff = await db.query.employees.findMany({
-  where: and(
-    eq(employees.department, "support"),
-    eq(employees.isActive, true)
-  ),
+  where: and(eq(employees.department, "support"), eq(employees.isActive, true)),
   with: {
     user: true, // Include user email, name, etc.
   },
@@ -308,7 +309,7 @@ A user can be **either** a customer **or** an employee, but **not both**:
 ### Database Constraints
 
 - **Foreign Keys**: All relationships use foreign key constraints with cascade delete
-- **Unique Constraints**: 
+- **Unique Constraints**:
   - `customers.userId` is unique (one customer per user)
   - `employees.userId` is unique (one employee record per user)
   - `users.email` is unique
@@ -323,41 +324,53 @@ A user can be **either** a customer **or** an employee, but **not both**:
 
 ```typescript
 // 1. Create user record
-const user = await db.insert(users).values({
-  email: "owner@restaurant.com",
-  password: hashedPassword,
-  name: "John Doe",
-  role: "customer", // Important: must be "customer"
-}).returning();
+const user = await db
+  .insert(users)
+  .values({
+    email: "owner@restaurant.com",
+    password: hashedPassword,
+    name: "John Doe",
+    role: "customer", // Important: must be "customer"
+  })
+  .returning();
 
 // 2. Create customer record
-const customer = await db.insert(customers).values({
-  userId: user[0].id,
-  companyName: "ABC Restaurant",
-  email: "owner@restaurant.com",
-  status: "active",
-}).returning();
+const customer = await db
+  .insert(customers)
+  .values({
+    userId: user[0].id,
+    companyName: "ABC Restaurant",
+    email: "owner@restaurant.com",
+    status: "active",
+  })
+  .returning();
 ```
 
 ### 2. Creating a New Employee User
 
 ```typescript
 // 1. Create user record
-const user = await db.insert(users).values({
-  email: "support@auraswift.com",
-  password: hashedPassword,
-  name: "Jane Smith",
-  role: "support", // Can be "admin", "support", or "developer"
-}).returning();
+const user = await db
+  .insert(users)
+  .values({
+    email: "support@Aurswift.com",
+    password: hashedPassword,
+    name: "Jane Smith",
+    role: "support", // Can be "admin", "support", or "developer"
+  })
+  .returning();
 
 // 2. Create employee record (optional)
-const employee = await db.insert(employees).values({
-  userId: user[0].id,
-  department: "support",
-  jobTitle: "Customer Support Specialist",
-  isActive: true,
-  hiredAt: new Date(),
-}).returning();
+const employee = await db
+  .insert(employees)
+  .values({
+    userId: user[0].id,
+    department: "support",
+    jobTitle: "Customer Support Specialist",
+    isActive: true,
+    hiredAt: new Date(),
+  })
+  .returning();
 ```
 
 ### 3. Getting Customer Data from Session
@@ -367,14 +380,14 @@ import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
 
 export async function GET(request: Request) {
   const session = await getServerSession();
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // This throws if customer doesn't exist
   const customer = await getCustomerOrThrow(session.user.id);
-  
+
   // Use customer data
   return NextResponse.json({ customer });
 }
@@ -409,15 +422,18 @@ if (
 
 ```typescript
 // When user signs in with OAuth for the first time
-const account = await db.insert(accounts).values({
-  userId: user.id,
-  type: "oauth",
-  provider: "google",
-  providerAccountId: googleUser.id,
-  accessToken: encryptedToken,
-  refreshToken: encryptedRefreshToken,
-  expiresAt: tokenExpiry,
-}).returning();
+const account = await db
+  .insert(accounts)
+  .values({
+    userId: user.id,
+    type: "oauth",
+    provider: "google",
+    providerAccountId: googleUser.id,
+    accessToken: encryptedToken,
+    refreshToken: encryptedRefreshToken,
+    expiresAt: tokenExpiry,
+  })
+  .returning();
 ```
 
 ---
@@ -439,6 +455,7 @@ The current design uses **one-to-one** relationships (`customers.userId` and `em
 - ✅ **One user = One employee record** (internal staff are individuals)
 
 **Future Enhancement**: If team accounts are needed (multiple users per customer), you could:
+
 1. Add a `customerUsers` junction table for many-to-many
 2. Keep `customers.userId` as the "primary owner"
 3. Allow additional users to be linked via the junction table
@@ -471,11 +488,11 @@ AND e.user_id IS NULL;
 
 ## Summary
 
-| Table | Purpose | Relationship to Users | When Created |
-|-------|---------|----------------------|--------------|
-| **users** | Core authentication | N/A (base table) | On signup/login |
-| **accounts** | OAuth providers | Many-to-One | When linking OAuth account |
-| **customers** | Business customers | One-to-One (unique) | When `role = "customer"` signs up |
-| **employees** | Internal staff | One-to-One (unique) | When `role = "admin"\|"support"\|"developer"` is created |
+| Table         | Purpose             | Relationship to Users | When Created                                             |
+| ------------- | ------------------- | --------------------- | -------------------------------------------------------- |
+| **users**     | Core authentication | N/A (base table)      | On signup/login                                          |
+| **accounts**  | OAuth providers     | Many-to-One           | When linking OAuth account                               |
+| **customers** | Business customers  | One-to-One (unique)   | When `role = "customer"` signs up                        |
+| **employees** | Internal staff      | One-to-One (unique)   | When `role = "admin"\|"support"\|"developer"` is created |
 
 **Key Takeaway**: A user can be **either** a customer **or** an employee (or neither, if just authenticated), but never both. The `users.role` field determines which path they follow.

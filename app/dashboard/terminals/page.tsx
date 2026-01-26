@@ -34,6 +34,7 @@ interface TerminalActivation {
   firstActivation: Date;
   lastHeartbeat: Date | null;
   isActive: boolean;
+  isLiveConnected?: boolean; // Real-time SSE connection status
   ipAddress: string | null;
   location: {
     city?: string;
@@ -113,9 +114,12 @@ export default function TerminalsPage() {
   const handleDeactivate = async (activationId: string) => {
     try {
       setDeactivatingId(activationId);
-      const response = await fetch(`/api/terminals/${activationId}/deactivate`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `/api/terminals/${activationId}/deactivate`,
+        {
+          method: "POST",
+        }
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -158,9 +162,22 @@ export default function TerminalsPage() {
     }
   };
 
-  const getStatusBadge = (isActive: boolean, lastHeartbeat: Date | null) => {
+  const getStatusBadge = (
+    isActive: boolean,
+    lastHeartbeat: Date | null,
+    isLiveConnected?: boolean
+  ) => {
     if (!isActive) {
       return <Badge variant="outline">Inactive</Badge>;
+    }
+
+    // If we have real-time SSE connection status, use that first
+    if (isLiveConnected) {
+      return (
+        <Badge variant="default" className="bg-green-600">
+          Online
+        </Badge>
+      );
     }
 
     if (!lastHeartbeat) {
@@ -256,8 +273,9 @@ export default function TerminalsPage() {
                 <AlertDialogTitle>Cleanup Stale Terminals?</AlertDialogTitle>
                 <AlertDialogDescription>
                   This will remove {staleInfo.staleCount} stale terminal(s) that
-                  are either inactive or haven&apos;t connected in over 24 hours.
-                  This will free up {staleInfo.staleCount} license slot(s).
+                  are either inactive or haven&apos;t connected in over 24
+                  hours. This will free up {staleInfo.staleCount} license
+                  slot(s).
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -342,10 +360,14 @@ export default function TerminalsPage() {
                         </h3>
                         {getStatusBadge(
                           activation.isActive,
-                          activation.lastHeartbeat
+                          activation.lastHeartbeat,
+                          activation.isLiveConnected
                         )}
                         {isStale(activation) && activation.isActive && (
-                          <Badge variant="outline" className="text-orange-600 border-orange-300">
+                          <Badge
+                            variant="outline"
+                            className="text-orange-600 border-orange-300"
+                          >
                             Stale
                           </Badge>
                         )}
