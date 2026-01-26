@@ -44,9 +44,10 @@ async function migrateLicenseKeys() {
           continue;
         }
 
-        // Determine plan from max terminals (basic=1, professional=5)
+        // Determine plan from max terminals (basic=3, professional=5)
+        // Handle both new (3) and legacy (1) basic plan licenses
         let planId: PlanId = "professional"; // default
-        if (license.maxTerminals === 1) {
+        if (license.maxTerminals === 3 || license.maxTerminals === 1) {
           planId = "basic";
         } else {
           planId = "professional";

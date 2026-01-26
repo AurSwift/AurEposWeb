@@ -34,9 +34,9 @@ For best practices, store plan features in Stripe product metadata. This makes S
 
 ```json
 {
-  "maxTerminals": 1,
+  "maxTerminals": 3,
   "features": [
-    "Single terminal",
+    "Up to 3 terminals",
     "Basic inventory management",
     "Sales reporting",
     "Email support (48hr response)"

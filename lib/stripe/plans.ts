@@ -33,9 +33,9 @@ export interface Plan {
 // These map to plan IDs and define what each plan includes
 const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
   basic: {
-    maxTerminals: 1,
+    maxTerminals: 3,
     features: [
-      "Single terminal",
+      "Up to 3 terminals",
       "Basic inventory management",
       "Sales reporting",
       "Email support (48hr response)",

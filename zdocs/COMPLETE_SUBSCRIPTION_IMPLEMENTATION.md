@@ -349,7 +349,7 @@ User Action                    Server Action                    Database
 │  $49/mo     $99/mo        $299/mo  │
 │                                     │
 │  Features:                          │
-│  • Single terminal                  │
+│  • Up to 3 terminals                │
 │  • Basic inventory                  │
 │                                     │
 │  [Continue]                          │
