@@ -48,8 +48,7 @@ function PricingPageContent() {
     if (
       planParam &&
       (planParam === "basic" ||
-        planParam === "professional" ||
-        planParam === "enterprise")
+        planParam === "professional")
     ) {
       setFormData((prev) => ({
         ...prev,
@@ -78,7 +77,7 @@ function PricingPageContent() {
           }
           
           // Basic validation of plan structure
-          const planIds: PlanId[] = ["basic", "professional", "enterprise"];
+          const planIds: PlanId[] = ["basic", "professional"];
           for (const planId of planIds) {
             if (!data.plans[planId]) {
               console.warn(`Missing plan: ${planId}`);
@@ -87,12 +86,14 @@ function PricingPageContent() {
           
           setPlans(data.plans);
           setError("");
+          setPlansLoading(false); // Mark loading as complete on success
           return;
         } catch (err) {
           console.error(`Attempt ${attempt + 1} failed:`, err);
           
           if (attempt === retries - 1) {
             setError("Failed to load plans. Please refresh the page.");
+            setPlansLoading(false); // Mark loading as complete on final failure
           } else {
             // Exponential backoff
             await new Promise((resolve) =>
@@ -101,7 +102,6 @@ function PricingPageContent() {
           }
         }
       }
-      setPlansLoading(false);
     }
     
     fetchPlans();

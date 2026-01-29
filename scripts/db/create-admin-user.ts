@@ -1,9 +1,9 @@
 /**
  * Create Admin User Script
- * 
+ *
  * This script creates an admin user in the database
  * Run with: npx tsx scripts/create-admin-user.ts
- * 
+ *
  * Usage:
  *   npx tsx scripts/create-admin-user.ts admin@example.com "Admin Name" "password123"
  */
@@ -17,9 +17,13 @@ async function createAdminUser() {
   const [email, name, password] = process.argv.slice(2);
 
   if (!email || !name || !password) {
-    console.error("❌ Usage: npx tsx scripts/create-admin-user.ts <email> <name> <password>");
+    console.error(
+      "❌ Usage: npx tsx scripts/create-admin-user.ts <email> <name> <password>"
+    );
     console.error("\nExample:");
-    console.error('  npx tsx scripts/create-admin-user.ts admin@auraswift.com "Admin User" "SecurePass123"');
+    console.error(
+      '  npx tsx scripts/create-admin-user.ts admin@aurswift.com "Admin User" "SecurePass123"'
+    );
     process.exit(1);
   }
 
@@ -70,4 +74,3 @@ async function createAdminUser() {
 }
 
 createAdminUser();
-

@@ -3,6 +3,26 @@
     {
       "path": "/api/cron/expiration-check",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-events",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/retry-events",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/analytics",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/detect-stale-sessions",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/health-monitoring",
+      "schedule": "0 * * * *"
     }
   ]
 }

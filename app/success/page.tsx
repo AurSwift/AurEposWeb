@@ -11,9 +11,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CheckCircle2, Download, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { LicenseKeyCard } from "@/components/license-key-card";
 import { Label } from "@/components/ui/label";
+import { SuccessDownloadButton } from "@/components/success-download-button";
 
 interface Subscription {
   planId: string;
@@ -172,12 +173,7 @@ function SuccessPageContent() {
                   Go to Dashboard
                 </Link>
               </Button>
-              <Button className="flex-1" asChild>
-                <a href="#" download>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Software
-                </a>
-              </Button>
+              <SuccessDownloadButton />
             </div>
           </CardContent>
         </Card>

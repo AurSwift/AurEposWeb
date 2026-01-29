@@ -97,7 +97,6 @@ export function extractPlanFromKey(key: string): PlanId | null {
   const codeToId: Record<string, PlanId> = {
     BAS: "basic",
     PRO: "professional",
-    ENT: "enterprise",
   };
 
   return codeToId[match[1]] || null;

@@ -20,7 +20,7 @@ async function createAdminUser() {
     console.error("❌ Usage: npm run admin:create <email> <name> <password>");
     console.error("\nExample:");
     console.error(
-      '  npm run admin:create admin@auraswift.com "Admin User" "SecurePass123"'
+      '  npm run admin:create admin@aurswift.com "Admin User" "SecurePass123"'
     );
     console.error("\n💡 Note: This creates an ADMIN user (full access)");
     console.error("   For startup: Make all team members admins");

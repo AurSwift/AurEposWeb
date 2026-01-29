@@ -18,6 +18,19 @@ export class CustomerNotFoundError extends Error {
 }
 
 /**
+ * Custom error for deleted customer scenarios
+ * Provides consistent error handling for soft-deleted customers
+ */
+export class CustomerDeletedError extends Error {
+  public readonly statusCode = 403;
+
+  constructor(message: string = "Customer account has been deleted") {
+    super(message);
+    this.name = "CustomerDeletedError";
+  }
+}
+
+/**
  * Get customer by user ID
  *
  * @param userId - The user ID to look up
@@ -47,30 +60,45 @@ export async function getCustomerByUserId(
 }
 
 /**
- * Get customer by user ID or throw error if not found
- * Use this when customer must exist (will throw CustomerNotFoundError)
+ * Get customer by user ID or throw error if not found or deleted
+ * Use this when customer must exist and be active (will throw CustomerNotFoundError or CustomerDeletedError)
  *
  * @param userId - The user ID to look up
+ * @param allowDeleted - If true, allows returning deleted customers (default: false)
  * @returns Customer object
  * @throws {CustomerNotFoundError} If customer is not found
+ * @throws {CustomerDeletedError} If customer is soft-deleted and allowDeleted is false
  *
  * @example
  * try {
  *   const customer = await getCustomerOrThrow(session.user.id);
- *   // Customer exists, proceed with business logic
+ *   // Customer exists and is active, proceed with business logic
  * } catch (error) {
  *   if (error instanceof CustomerNotFoundError) {
  *     return NextResponse.json({ error: error.message }, { status: 404 });
  *   }
+ *   if (error instanceof CustomerDeletedError) {
+ *     return NextResponse.json({ error: error.message }, { status: 403 });
+ *   }
  *   throw error;
  * }
  */
-export async function getCustomerOrThrow(userId: string): Promise<Customer> {
+export async function getCustomerOrThrow(
+  userId: string,
+  allowDeleted: boolean = false
+): Promise<Customer> {
   const customer = await getCustomerByUserId(userId);
 
   if (!customer) {
     throw new CustomerNotFoundError(
       "Customer record not found. Please contact support if this persists."
+    );
+  }
+
+  // Check if customer has been soft-deleted
+  if (!allowDeleted && customer.status === "deleted") {
+    throw new CustomerDeletedError(
+      "Your customer account has been deleted. Please contact support or create a new account."
     );
   }
 

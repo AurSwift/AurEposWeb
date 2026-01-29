@@ -67,6 +67,8 @@ export interface ActivationResult {
     expiresAt: string | null;
     subscriptionStatus: string;
     businessName: string | null;
+    terminalName: string | null; // The actual terminal name saved to the database
+    trialEnd: string | null; // Trial end date for trial subscriptions
   };
 }
 
@@ -81,6 +83,7 @@ export interface ValidationResult {
     subscriptionStatus: string;
     expiresAt: string | null;
     daysUntilExpiry: number | null;
+    trialEnd: string | null; // Trial end date for trial subscriptions
   };
 }
 
@@ -93,6 +96,8 @@ export interface HeartbeatResult {
     subscriptionStatus: string;
     shouldDisable: boolean;
     gracePeriodRemaining: number | null;
+    trialEnd: string | null; // Trial end date for trial subscriptions
+    heartbeatIntervalMs?: number; // Interval in milliseconds for next heartbeat
   };
 }
 
@@ -181,41 +186,33 @@ export function extractPlanFromKey(key: string): string | null {
 
 /**
  * Get features based on plan
+ * Uses additive model: Professional includes all Basic features
  */
 export function getPlanFeatures(planId: string): string[] {
+  // Base features for Basic plan
+  const basicFeatures: string[] = [
+    "single_terminal",
+    "basic_reporting",
+    "product_management",
+    "sales_processing",
+    "receipt_printing",
+  ];
+
+  // Additional features for Professional plan (additive model)
+  const professionalAdditionalFeatures: string[] = [
+    "multi_terminal",
+    "advanced_reporting",
+    "inventory_management",
+    "employee_management",
+    "batch_tracking",
+    "expiry_tracking",
+  ];
+
   const features: Record<string, string[]> = {
-    basic: [
-      "single_terminal",
-      "basic_reporting",
-      "product_management",
-      "sales_processing",
-      "receipt_printing",
-    ],
+    basic: [...basicFeatures],
     professional: [
-      "multi_terminal",
-      "advanced_reporting",
-      "product_management",
-      "sales_processing",
-      "receipt_printing",
-      "inventory_management",
-      "employee_management",
-      "batch_tracking",
-      "expiry_tracking",
-    ],
-    enterprise: [
-      "unlimited_terminals",
-      "enterprise_reporting",
-      "product_management",
-      "sales_processing",
-      "receipt_printing",
-      "inventory_management",
-      "employee_management",
-      "batch_tracking",
-      "expiry_tracking",
-      "multi_location",
-      "api_access",
-      "priority_support",
-      "custom_integrations",
+      ...basicFeatures, // Professional includes all Basic features
+      ...professionalAdditionalFeatures, // Plus Professional-specific features
     ],
   };
 
@@ -296,6 +293,7 @@ export async function activateLicense(
       // Step 5: Check subscription status
       let subscriptionStatus = "active";
       let businessName: string | null = null;
+      let trialEnd: Date | null = null;
       if (license.subscriptionId) {
         const [subscription] = await tx
           .select()
@@ -305,12 +303,10 @@ export async function activateLicense(
 
         if (subscription) {
           subscriptionStatus = subscription.status || "active";
+          trialEnd = subscription.trialEnd;
 
-          // Allow trialing subscriptions
-          if (subscriptionStatus === "trialing") {
-            subscriptionStatus = "active";
-          }
-
+          // Keep "trialing" status so desktop app can show trial information
+          // Only block cancelled and past_due (trialing is allowed)
           if (
             subscriptionStatus === "cancelled" ||
             subscriptionStatus === "past_due"
@@ -379,6 +375,64 @@ export async function activateLicense(
             expiresAt: license.expiresAt?.toISOString() || null,
             subscriptionStatus,
             businessName,
+            terminalName:
+              terminalName || existingMachineActivation.terminalName, // Use updated or existing terminal name
+            trialEnd: trialEnd?.toISOString() || null,
+          },
+        };
+      }
+
+      // Step 7b: FINGERPRINT MIGRATION - Check if same terminal name exists
+      // This handles the case where machine fingerprint changed (e.g., network interface
+      // changes, VPN adapters added/removed) but it's the same physical device.
+      // We match by terminal name to allow fingerprint migration.
+      const existingTerminalByName = terminalName
+        ? existingActivations.find(
+            (a) => a.terminalName?.toLowerCase() === terminalName.toLowerCase()
+          )
+        : null;
+
+      if (existingTerminalByName) {
+        console.log(
+          `[Activation] Fingerprint migration detected for terminal: ${terminalName}`
+        );
+        console.log(
+          `[Activation] Old fingerprint: ${existingTerminalByName.machineIdHash?.substring(0, 20)}...`
+        );
+        console.log(
+          `[Activation] New fingerprint: ${machineIdHash.substring(0, 20)}...`
+        );
+
+        // Update the existing activation with the new fingerprint
+        await tx
+          .update(activations)
+          .set({
+            machineIdHash, // Update to new fingerprint
+            lastHeartbeat: new Date(),
+            terminalName: terminalName,
+            ipAddress: ipAddress || existingTerminalByName.ipAddress,
+            location: location || existingTerminalByName.location,
+          })
+          .where(eq(activations.id, existingTerminalByName.id));
+
+        const planId = extractPlanFromKey(normalizedKey) || "basic";
+
+        return {
+          success: true,
+          message:
+            "Device fingerprint migrated successfully. This can happen when network interfaces change.",
+          data: {
+            activationId: existingTerminalByName.id,
+            planId,
+            planName: planId.charAt(0).toUpperCase() + planId.slice(1),
+            maxTerminals: license.maxTerminals,
+            currentActivations: existingActivations.length,
+            features: getPlanFeatures(planId),
+            expiresAt: license.expiresAt?.toISOString() || null,
+            subscriptionStatus,
+            businessName,
+            terminalName,
+            trialEnd: trialEnd?.toISOString() || null,
           },
         };
       }
@@ -445,6 +499,8 @@ export async function activateLicense(
           expiresAt: license.expiresAt?.toISOString() || null,
           subscriptionStatus,
           businessName,
+          terminalName: newActivation.terminalName, // Include the actual terminal name saved to DB
+          trialEnd: trialEnd?.toISOString() || null,
         },
       };
     });
@@ -497,12 +553,15 @@ export async function validateLicense(
   if (!license.isActive || license.revokedAt) {
     return {
       success: false,
-      message: `License key has been revoked${license.revocationReason ? `: ${license.revocationReason}` : ""}`,
+      message: `License key has been revoked${
+        license.revocationReason ? `: ${license.revocationReason}` : ""
+      }`,
     };
   }
 
   // Step 4: Check subscription if linked
   let subscriptionStatus = "active";
+  let trialEnd: Date | null = null;
   if (license.subscriptionId) {
     const [subscription] = await db
       .select()
@@ -512,11 +571,8 @@ export async function validateLicense(
 
     if (subscription) {
       subscriptionStatus = subscription.status || "active";
-
-      // Trialing is considered active
-      if (subscriptionStatus === "trialing") {
-        subscriptionStatus = "active";
-      }
+      trialEnd = subscription.trialEnd;
+      // Keep original status (including "trialing") for accurate display
     }
   }
 
@@ -565,6 +621,7 @@ export async function validateLicense(
       subscriptionStatus,
       expiresAt: license.expiresAt?.toISOString() || null,
       daysUntilExpiry,
+      trialEnd: trialEnd?.toISOString() || null,
     },
   };
 }
@@ -611,6 +668,8 @@ export async function processHeartbeat(
         subscriptionStatus: "unknown",
         shouldDisable: true,
         gracePeriodRemaining: null,
+        trialEnd: null,
+        heartbeatIntervalMs: 15 * 60 * 1000, // Default interval
       },
     };
   }
@@ -632,6 +691,8 @@ export async function processHeartbeat(
         subscriptionStatus: "revoked",
         shouldDisable: true,
         gracePeriodRemaining: null,
+        trialEnd: null,
+        heartbeatIntervalMs: 15 * 60 * 1000, // Default interval
       },
     };
   }
@@ -639,6 +700,7 @@ export async function processHeartbeat(
   // Check subscription status
   let subscriptionStatus = "active";
   let shouldDisable = false;
+  let trialEnd: Date | null = null;
   let gracePeriodRemaining: number | null =
     OFFLINE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
@@ -651,6 +713,7 @@ export async function processHeartbeat(
 
     if (subscription) {
       subscriptionStatus = subscription.status || "active";
+      trialEnd = subscription.trialEnd;
       const now = new Date();
 
       // Check if currently in trial period
@@ -746,6 +809,12 @@ export async function processHeartbeat(
 
   const planId = extractPlanFromKey(normalizedKey) || "basic";
 
+  // Determine heartbeat interval based on trial status
+  // Trial period: 2 minutes for faster sync
+  // Active subscription: 15 minutes (default)
+  const isInTrial = subscriptionStatus === "trialing" && trialEnd && new Date(trialEnd) > new Date();
+  const heartbeatIntervalMs = isInTrial ? 2 * 60 * 1000 : 15 * 60 * 1000;
+
   return {
     success: true,
     message: "Heartbeat recorded",
@@ -755,6 +824,8 @@ export async function processHeartbeat(
       subscriptionStatus,
       shouldDisable,
       gracePeriodRemaining,
+      trialEnd: trialEnd?.toISOString() || null,
+      heartbeatIntervalMs,
     },
   };
 }

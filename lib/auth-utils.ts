@@ -261,7 +261,7 @@ export async function getUserData(userId: string): Promise<{
           ? "Basic Plan"
           : sub.planType === "professional"
           ? "Pro Plan"
-          : "Enterprise Plan",
+          : "Unknown Plan",
       status: sub.status || "Inactive",
       nextBillingDate:
         sub.currentPeriodEnd?.toISOString().split("T")[0] ||

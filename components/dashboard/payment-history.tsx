@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { ExternalLink, Download, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface Payment {
   id: string;
@@ -40,7 +41,9 @@ export function PaymentHistory() {
     totalPages: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchPayments = async (page: number = 1) => {
     try {
@@ -64,6 +67,34 @@ export function PaymentHistory() {
   useEffect(() => {
     fetchPayments();
   }, []);
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      const response = await fetch("/api/stripe/sync", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to sync");
+      }
+
+      toast({
+        title: "Sync completed",
+        description: `Synced ${data.syncedPayments || 0} payment(s), ${data.syncedPaymentMethods || 0} payment method(s), and ${data.syncedInvoices || 0} invoice(s).`,
+      });
+
+      // Refresh payment history after sync
+      await fetchPayments();
+    } catch (err) {
+      toast({
+        title: "Sync failed",
+        description: err instanceof Error ? err.message : "Failed to sync payment history",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -120,7 +151,19 @@ export function PaymentHistory() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Payment History</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Payment History</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing || loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync from Stripe"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {payments.length === 0 ? (

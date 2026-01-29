@@ -19,7 +19,7 @@ export function PricingStructuredData({ plans }: PricingStructuredDataProps) {
       priceCurrency: "USD",
       billingDuration: "P1M", // ISO 8601 duration: 1 month
       availability: "https://schema.org/InStock",
-      url: `https://auraswift.com/pricing?plan=${plan.id}&cycle=monthly`,
+      url: `https://aurswift.com/pricing?plan=${plan.id}&cycle=monthly`,
     },
     // Annual offer
     {
@@ -30,19 +30,19 @@ export function PricingStructuredData({ plans }: PricingStructuredDataProps) {
       priceCurrency: "USD",
       billingDuration: "P1Y", // ISO 8601 duration: 1 year
       availability: "https://schema.org/InStock",
-      url: `https://auraswift.com/pricing?plan=${plan.id}&cycle=annual`,
+      url: `https://aurswift.com/pricing?plan=${plan.id}&cycle=annual`,
     },
   ]);
 
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: "AuraSwift POS System",
+    name: "AurSwift EPOS System",
     description:
       "Modern point-of-sale and terminal management system with flexible pricing plans",
     brand: {
       "@type": "Brand",
-      name: "AuraSwift",
+      name: "AurSwift",
     },
     offers: {
       "@type": "AggregateOffer",

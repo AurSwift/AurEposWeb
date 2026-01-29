@@ -37,7 +37,6 @@ async function fixStripeMetadata() {
       basic: "basic",
       professional: "professional",
       pro: "professional", // Sometimes called "Pro"
-      enterprise: "enterprise",
     };
 
     for (const product of products.data) {
@@ -78,7 +77,7 @@ async function fixStripeMetadata() {
           `⚠ Could not determine planId for product "${product.name}" (${product.id})`
         );
         console.log(
-          `  Please manually update this product in Stripe Dashboard with metadata: planId = basic|professional|enterprise\n`
+          `  Please manually update this product in Stripe Dashboard with metadata: planId = basic|professional\n`
         );
       }
     }

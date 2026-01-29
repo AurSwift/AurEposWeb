@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate plan ID
-    if (!["basic", "professional", "enterprise"].includes(planId)) {
+    if (!["basic", "professional"].includes(planId)) {
       return NextResponse.json({ error: "Invalid plan ID" }, { status: 400 });
     }
 
@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
         trial_period_days: trialPeriodDays,
       },
       allow_promotion_codes: true, // Allow discount codes
+      billing_address_collection: "required", // Require billing address
     });
 
     return NextResponse.json({

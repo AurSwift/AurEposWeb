@@ -24,6 +24,12 @@ export function PaymentMethodCard() {
   useEffect(() => {
     async function fetchPaymentMethod() {
       try {
+        // First, sync from Stripe to ensure we have latest data
+        await fetch("/api/stripe/sync", { method: "POST" }).catch((err) => {
+          console.warn("Sync failed, continuing with local data:", err);
+        });
+
+        // Then fetch from database
         const response = await fetch("/api/stripe/billing/payment-method");
         const data = await response.json();
 

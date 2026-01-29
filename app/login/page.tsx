@@ -31,7 +31,7 @@ function LoginForm() {
   useEffect(() => {
     const verified = searchParams?.get("verified");
     const emailParam = searchParams?.get("email");
-    
+
     if (verified === "true") {
       setShowVerifiedMessage(true);
       if (emailParam) {
@@ -65,7 +65,7 @@ function LoginForm() {
 
       // Check if there's a callback URL (e.g., from email verification)
       const callbackUrl = searchParams?.get("callbackUrl");
-      
+
       if (callbackUrl) {
         // Redirect to the callback URL (e.g., plan selection)
         window.location.href = decodeURIComponent(callbackUrl);
@@ -108,7 +108,7 @@ function LoginForm() {
               alt="Aurswift Logo"
               width={40}
               height={40}
-              className="h-10 w-10 object-cover"
+              className="h-10 w-13 object-cover"
               priority
             />
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -222,28 +222,30 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
-        <Card className="w-full max-w-md shadow-xl border-border/50">
-          <CardHeader className="space-y-1 text-center pb-6">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Image
-                src="/logo.png"
-                alt="Aurswift Logo"
-                width={40}
-                height={40}
-                className="h-10 w-10 object-cover"
-                priority
-              />
-              <CardTitle className="text-3xl font-bold">Aurswift</CardTitle>
-            </div>
-            <CardDescription className="text-base">
-              Loading...
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
+          <Card className="w-full max-w-md shadow-xl border-border/50">
+            <CardHeader className="space-y-1 text-center pb-6">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <Image
+                  src="/logo.png"
+                  alt="Aurswift Logo"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 object-cover"
+                  priority
+                />
+                <CardTitle className="text-3xl font-bold">Aurswift</CardTitle>
+              </div>
+              <CardDescription className="text-base">
+                Loading...
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

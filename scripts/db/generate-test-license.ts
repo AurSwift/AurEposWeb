@@ -8,5 +8,4 @@ import { generateLicenseKey } from "../../lib/license/generator";
 console.log("\n🔑 License Key Generator\n");
 console.log("Basic Plan:        ", generateLicenseKey("basic", "test-customer"));
 console.log("Professional Plan: ", generateLicenseKey("professional", "test-customer"));
-console.log("Enterprise Plan:   ", generateLicenseKey("enterprise", "test-customer"));
 console.log("\n✅ Copy any of the above keys to test in your desktop app!\n");

@@ -140,6 +140,7 @@ export function publishSubscriptionUpdated(
     newStatus: string;
     shouldDisable: boolean;
     gracePeriodRemaining: number | null;
+    trialEnd?: string | null;
   }
 ): void {
   const event = createSubscriptionEvent(

@@ -17,7 +17,14 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { PlanCard } from "@/components/pricing/plan-card";
 import { BillingToggle } from "@/components/pricing/billing-toggle";
 import { type PlanId, type BillingCycle, type Plan } from "@/lib/stripe/plans";
@@ -91,7 +98,7 @@ function SignupPageContent() {
     if (stepParam === "plan" && verified === "true") {
       setStep("plan");
       setError(""); // Clear any errors
-      
+
       // If user is logged in, show welcome message instead of verification message
       if (session?.user) {
         setShowWelcomeMessage(true);
@@ -216,7 +223,7 @@ function SignupPageContent() {
                 alt="Aurswift Logo"
                 width={40}
                 height={40}
-                className="h-10 w-10 object-cover"
+                className="h-10 w-13 object-cover"
                 priority
               />
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -294,7 +301,9 @@ function SignupPageContent() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-sm"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -389,8 +398,10 @@ function SignupPageContent() {
             <Alert className="mb-8 max-w-2xl mx-auto animate-in fade-in-50 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
               <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Welcome, {session.user.name || session.user.email}!</strong> Please select a
-                plan to continue.
+                <strong>
+                  Welcome, {session.user.name || session.user.email}!
+                </strong>{" "}
+                Please select a plan to continue.
               </AlertDescription>
             </Alert>
           )}

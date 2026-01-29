@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { payments, subscriptions } from "@/lib/db/schema";
+import { invoices, subscriptions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "@/lib/api/auth-helpers";
 import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
@@ -12,53 +12,59 @@ export async function GET(_request: NextRequest) {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);
 
-    // Get all payments with subscription info
+    // Get all invoices with subscription info
+    // We use the invoices table as the source of truth for billing history
     const billingHistory = await db
       .select({
-        id: payments.id,
-        amount: payments.amount,
-        currency: payments.currency,
-        status: payments.status,
-        paymentType: payments.paymentType,
-        invoiceUrl: payments.invoiceUrl,
-        billingPeriodStart: payments.billingPeriodStart,
-        billingPeriodEnd: payments.billingPeriodEnd,
-        paidAt: payments.paidAt,
-        createdAt: payments.createdAt,
+        id: invoices.id,
+        stripeInvoiceId: invoices.stripeInvoiceId,
+        number: invoices.number,
+        total: invoices.total,
+        currency: invoices.currency,
+        status: invoices.status,
+        hostedInvoiceUrl: invoices.hostedInvoiceUrl,
+        invoicePdf: invoices.invoicePdf,
+        periodStart: invoices.periodStart,
+        periodEnd: invoices.periodEnd,
+        paidAt: invoices.paidAt,
+        createdAt: invoices.createdAt,
+        description: invoices.description,
         subscription: {
           planId: subscriptions.planId,
           billingCycle: subscriptions.billingCycle,
         },
       })
-      .from(payments)
-      .leftJoin(subscriptions, eq(payments.subscriptionId, subscriptions.id))
-      .where(eq(payments.customerId, customer.id))
-      .orderBy(desc(payments.createdAt));
+      .from(invoices)
+      .leftJoin(subscriptions, eq(invoices.subscriptionId, subscriptions.id))
+      .where(eq(invoices.customerId, customer.id))
+      .orderBy(desc(invoices.createdAt));
 
     return successResponse({
       billingHistory: billingHistory.map((item) => ({
         id: item.id,
-        invoiceId: `INV-${item.id.substring(0, 8).toUpperCase()}`,
+        // Use the friendly invoice number if available, otherwise the Stripe ID
+        invoiceId: item.number || item.stripeInvoiceId,
         date: item.createdAt,
-        amount: parseFloat(item.amount),
+        // Convert from cents to decimal currency unit
+        amount: item.total ? item.total / 100 : 0,
         currency: item.currency,
-        status: item.status === "completed" ? "Paid" : item.status,
+        status: item.status.charAt(0).toUpperCase() + item.status.slice(1),
         plan: item.subscription?.planId
           ? getPlanDisplayName(item.subscription.planId)
-          : "N/A",
+          : item.description || "Subscription",
         period:
-          item.billingPeriodStart && item.billingPeriodEnd
-            ? `${new Date(item.billingPeriodStart).toLocaleDateString("en-US", {
+          item.periodStart && item.periodEnd
+            ? `${new Date(item.periodStart).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
-              })} - ${new Date(item.billingPeriodEnd).toLocaleDateString("en-US", {
+              })} - ${new Date(item.periodEnd).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
               })}`
             : null,
-        invoiceUrl: item.invoiceUrl,
+        invoiceUrl: item.hostedInvoiceUrl || item.invoicePdf,
         paidAt: item.paidAt,
       })),
     });

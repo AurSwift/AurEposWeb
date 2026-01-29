@@ -1,6 +1,6 @@
 # Database Management Scripts
 
-This directory contains utility scripts for managing the AuraSwift database. These scripts are designed to help with development, testing, and maintenance tasks.
+This directory contains utility scripts for managing the Aurswift database. These scripts are designed to help with development, testing, and maintenance tasks.
 
 ## 📁 Folder Structure
 
@@ -299,7 +299,7 @@ TOTAL                                     418
 ```json
 {
   "timestamp": "2026-01-06T10:30:00.000Z",
-  "databaseUrl": "localhost:5432/auraswift",
+  "databaseUrl": "localhost:5432/Aurswift",
   "tables": [
     { "name": "customers", "count": 15, "category": "business" },
     { "name": "users", "count": 18, "category": "auth" }
@@ -672,7 +672,7 @@ pnpm db:studio
 
 ## ⚖️ License
 
-These scripts are part of the AuraSwift project and follow the same license.
+These scripts are part of the Aurswift project and follow the same license.
 
 ---
 

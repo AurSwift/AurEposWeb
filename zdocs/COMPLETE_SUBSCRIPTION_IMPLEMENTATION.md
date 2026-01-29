@@ -19,7 +19,7 @@
 
 This plan implements a complete subscription flow where:
 1. Customer registers account
-2. Selects plan (Basic/Professional/Enterprise)
+2. Selects plan (Basic/Professional)
 3. Chooses billing cycle (Monthly/Annual with 20% discount)
 4. Redirects to Stripe Checkout
 5. Stripe processes payment
@@ -48,9 +48,6 @@ This plan implements a complete subscription flow where:
    - Product: "Professional Plan"
      - Price: $99/month (recurring)
      - Price: $950/year (recurring, 20% discount)
-   - Product: "Enterprise Plan"
-     - Price: $299/month (recurring)
-     - Price: $2,870/year (recurring, 20% discount)
 4. Copy Price IDs to environment variables
 
 ### 2. Environment Variables
@@ -67,8 +64,6 @@ STRIPE_PRICE_ID_BASIC_MONTHLY=price_...
 STRIPE_PRICE_ID_BASIC_ANNUAL=price_...
 STRIPE_PRICE_ID_PRO_MONTHLY=price_...
 STRIPE_PRICE_ID_PRO_ANNUAL=price_...
-STRIPE_PRICE_ID_ENTERPRISE_MONTHLY=price_...
-STRIPE_PRICE_ID_ENTERPRISE_ANNUAL=price_...
 ```
 
 ### 3. Install Dependencies
@@ -350,11 +345,11 @@ User Action                    Server Action                    Database
 ┌─────────────────────────────────────┐
 │  Choose Your Plan                    │
 ├─────────────────────────────────────┤
-│  [Basic]    [Professional★] [Enterprise]
+│  [Basic]    [Professional★]
 │  $49/mo     $99/mo        $299/mo  │
 │                                     │
 │  Features:                          │
-│  • Single terminal                  │
+│  • Up to 3 terminals                │
 │  • Basic inventory                  │
 │                                     │
 │  [Continue]                          │
@@ -511,5 +506,410 @@ User Action                    Server Action                    Database
 
 ---
 
-This plan provides everything needed to implement the complete subscription flow with Stripe integration!
+## 🔄 Subscription Upgrade & Downgrade Scenarios
 
+### Overview
+
+Aurswift handles subscription changes with **automatic proration** following Stripe best practices. When customers upgrade or downgrade their plans, the system calculates the difference in cost for the remaining billing period and either charges the customer immediately (upgrade) or applies a credit to the next invoice (downgrade).
+
+---
+
+### Scenario 1: Upgrade (Plan A → Plan B on Jan 4)
+
+**Timeline:**
+- **Jan 2, 2026**: Customer purchases Plan A (Basic - $49/month)
+- **Jan 4, 2026**: Customer upgrades to Plan B (Professional - $99/month)
+
+**What Happens:**
+
+1. **Initial Purchase (Jan 2)**
+   - Customer subscribes to Basic plan at $49/month
+   - Billing period: Jan 2 - Feb 2 (31 days)
+   - Full $49 charge on Jan 2
+   - Status: `active` or `trialing` (if 7-day trial)
+
+2. **Upgrade Request (Jan 4)**
+   - Customer clicks "Upgrade to Professional" in dashboard
+   - System calls `/api/subscriptions/preview-change` to show proration
+   - Preview shows:
+     ```
+     Current Plan: Basic ($49/month)
+     New Plan: Professional ($99/month)
+     
+     Proration Charge: $46.45
+     Calculation:
+     - Days remaining: 29 days (Jan 4 - Feb 2)
+     - Unused Basic credit: (29/31) × $49 = $45.81
+     - Professional charge for 29 days: (29/31) × $99 = $92.26
+     - Immediate charge: $92.26 - $45.81 = $46.45
+     
+     Next billing: Feb 2, 2026 for $99.00
+     ```
+
+3. **Upgrade Execution**
+   - API endpoint: `POST /api/subscriptions/change-plan`
+   - Request body:
+     ```json
+     {
+       "subscriptionId": "sub_abc123",
+       "newPlanId": "professional",
+       "newBillingCycle": "monthly"
+     }
+     ```
+
+4. **Stripe Processing**
+   - Stripe updates subscription with `proration_behavior: "create_prorations"`
+   - Creates immediate invoice for $46.45
+   - Charges customer's payment method
+   - Updates subscription to Professional plan
+
+5. **Database Updates (Transaction)**
+   ```sql
+   -- Update subscription record
+   UPDATE subscriptions SET
+     plan_id = 'professional',
+     price = '99.00',
+     updated_at = NOW()
+   WHERE id = 'sub_abc123';
+   
+   -- Record change in audit trail
+   INSERT INTO subscription_changes (
+     subscription_id,
+     customer_id,
+     change_type,
+     previous_plan_id,
+     new_plan_id,
+     previous_price,
+     new_price,
+     proration_amount,
+     effective_date,
+     reason
+   ) VALUES (
+     'sub_abc123',
+     'cust_xyz789',
+     'plan_upgrade',
+     'basic',
+     'professional',
+     '49.00',
+     '99.00',
+     '46.45',
+     '2026-01-04',
+     'Plan changed from basic to professional'
+   );
+   
+   -- Update license key terminal limits
+   UPDATE license_keys SET
+     max_terminals = 5
+   WHERE subscription_id = 'sub_abc123';
+   ```
+
+6. **Desktop App Notification**
+   - SSE (Server-Sent Event) broadcast to desktop apps
+   - Desktop app shows: "Subscription upgraded! You can now activate up to 5 terminals."
+
+7. **Email Notification**
+   - Customer receives upgrade confirmation email
+   - Invoice for $46.45 proration charge attached
+
+**Result:**
+- ✅ Customer immediately gets Professional plan benefits
+- ✅ License key now allows 5 terminals (was 1)
+- ✅ Charged $46.45 for remaining 29 days
+- ✅ Next billing: Feb 2 for $99.00
+
+---
+
+### Scenario 2: Downgrade (Plan C → Plan B on Jan 6)
+
+**Timeline:**
+- **Jan 3, 2026**: Customer purchases Plan C (Enterprise - $299/month)
+- **Jan 6, 2026**: Customer downgrades to Plan B (Professional - $99/month)
+
+**What Happens:**
+
+1. **Initial Purchase (Jan 3)**
+   - Customer subscribes to Enterprise plan at $299/month
+   - Billing period: Jan 3 - Feb 3 (31 days)
+   - Full $299 charge on Jan 3
+   - Status: `active` or `trialing` (if 7-day trial)
+
+2. **Downgrade Request (Jan 6)**
+   - Customer clicks "Change Plan" → selects Professional
+   - System calls `/api/subscriptions/preview-change` to show impact
+   - Preview shows:
+     ```
+     Current Plan: Enterprise ($299/month)
+     New Plan: Professional ($99/month)
+     
+     Credit Applied: $193.55
+     Calculation:
+     - Days remaining: 28 days (Jan 6 - Feb 3)
+     - Unused Enterprise credit: (28/31) × $299 = $269.68
+     - Professional charge for 28 days: (28/31) × $99 = $89.42
+     - Credit to next invoice: $269.68 - $89.42 = $180.26
+     
+     Effective immediately
+     Next billing: Feb 3, 2026 for $99.00 (minus $180.26 credit)
+     ```
+
+3. **Downgrade Execution**
+   - API endpoint: `POST /api/subscriptions/change-plan`
+   - Request body:
+     ```json
+     {
+       "subscriptionId": "sub_def456",
+       "newPlanId": "professional",
+       "newBillingCycle": "monthly"
+     }
+     ```
+
+4. **Stripe Processing**
+   - Stripe updates subscription with `proration_behavior: "create_prorations"`
+   - Creates credit of $180.26 for unused Enterprise time
+   - Credit applied to next invoice (Feb 3)
+   - Immediately switches to Professional plan
+
+5. **Database Updates (Transaction)**
+   ```sql
+   -- Update subscription record
+   UPDATE subscriptions SET
+     plan_id = 'professional',
+     price = '99.00',
+     updated_at = NOW()
+   WHERE id = 'sub_def456';
+   
+   -- Record change in audit trail
+   INSERT INTO subscription_changes (
+     subscription_id,
+     customer_id,
+     change_type,
+     previous_plan_id,
+     new_plan_id,
+     previous_price,
+     new_price,
+     proration_amount,
+     effective_date,
+     reason
+   ) VALUES (
+     'sub_def456',
+     'cust_uvw456',
+     'plan_upgrade',
+     'basic',
+     'professional',
+     '49.00',
+     '99.00',
+     '42.10',  -- Positive = charge
+     '2026-01-06',
+     'Plan changed from basic to professional'
+   );
+   
+   -- Update license key terminal limits
+   UPDATE license_keys SET
+     max_terminals = 5  -- Was 1, now 5
+   WHERE subscription_id = 'sub_def456';
+   ```
+
+6. **Desktop App Notification**
+   - SSE broadcast to desktop apps
+   - Desktop app shows: "Plan changed to Professional. Terminal limit: 5"
+   - If customer has > 5 active terminals, shows warning to deactivate extras
+
+7. **Email Notification**
+   - Customer receives downgrade confirmation email
+   - Shows $180.26 credit will be applied to next invoice
+
+**Result:**
+- ✅ Customer immediately switched to Professional plan
+- ✅ License key now limits to 5 terminals (was unlimited)
+- ✅ $180.26 credit applied to account
+- ✅ Next billing: Feb 3 for $99.00, but only charged $0 (credit > invoice)
+- ✅ Remaining credit ($81.26) rolls to following month
+
+---
+
+### Best Practices Implemented
+
+| Practice | Implementation | Benefit |
+|----------|----------------|---------|
+| **Immediate Upgrades** | ✅ Applied instantly with proration charge | Better UX, instant access to features |
+| **Downgrade Credits** | ✅ Credit applied to next invoice | Fair billing, no immediate charge |
+| **Proration Calculation** | ✅ Automatic via Stripe | Accurate, no manual calculations |
+| **Preview Before Change** | ✅ `/api/subscriptions/preview-change` endpoint | Transparency, informed decisions |
+| **Audit Trail** | ✅ `subscription_changes` table | Compliance, support debugging |
+| **License Limit Updates** | ✅ Immediate terminal limit changes | Prevent over-usage, enforce tiers |
+| **SSE Notifications** | ✅ Real-time desktop app updates | Seamless desktop integration |
+| **Email Confirmations** | ✅ Automated notifications | Customer awareness, records |
+
+---
+
+### API Endpoints Reference
+
+#### 1. Preview Subscription Change
+```typescript
+POST /api/subscriptions/preview-change
+Request: {
+  subscriptionId: string,
+  newPlanId: "basic" | "professional",
+  newBillingCycle?: "monthly" | "annual"
+}
+
+Response: {
+  preview: {
+    changeType: "upgrade" | "downgrade",
+    currentPlan: { id, name, price, billingCycle },
+    newPlan: { id, name, price, billingCycle, maxTerminals },
+    proration: {
+      amount: number,
+      immediateCharge: number,
+      creditApplied: number,
+      currency: string,
+      description: string
+    },
+    nextBilling: { date, amount, currency },
+    effectiveDate: Date
+  }
+}
+```
+
+#### 2. Execute Plan Change
+```typescript
+POST /api/subscriptions/change-plan
+Request: {
+  subscriptionId: string,
+  newPlanId: "basic" | "professional",
+  newBillingCycle?: "monthly" | "annual"
+}
+
+Response: {
+  success: true,
+  message: string,
+  subscription: {
+    planId: string,
+    billingCycle: string,
+    price: number,
+    prorationAmount: number
+  }
+}
+```
+
+---
+
+### UI Components
+
+#### Subscription History Display
+New component: `components/dashboard/subscription-history-card.tsx`
+
+Shows all past plan changes with:
+- Change type badge (Upgrade/Downgrade/Cancelled)
+- Date of change
+- Previous plan → New plan
+- Proration amount (charged or credited)
+- Change reason
+
+**Usage:**
+```tsx
+import { SubscriptionHistoryCard } from "@/components/dashboard/subscription-history-card";
+
+// Fetch subscription changes
+const changes = await db.select()
+  .from(subscriptionChanges)
+  .where(eq(subscriptionChanges.customerId, customerId))
+  .orderBy(desc(subscriptionChanges.effectiveDate));
+
+<SubscriptionHistoryCard changes={changes} />
+```
+
+---
+
+### Testing the Scenarios
+
+#### Test Scenario 1 (Upgrade)
+```bash
+# 1. Create subscription on Jan 2
+curl -X POST http://localhost:3000/api/stripe/checkout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "planId": "basic",
+    "billingCycle": "monthly"
+  }'
+
+# 2. Complete Stripe checkout
+
+# 3. Wait for webhook (or use Stripe CLI)
+stripe trigger checkout.session.completed
+
+# 4. Preview upgrade on Jan 4
+curl -X POST http://localhost:3000/api/subscriptions/preview-change \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subscriptionId": "sub_abc123",
+    "newPlanId": "professional"
+  }'
+
+# 5. Execute upgrade
+curl -X POST http://localhost:3000/api/subscriptions/change-plan \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subscriptionId": "sub_abc123",
+    "newPlanId": "professional"
+  }'
+```
+
+#### Test Scenario 2 (Downgrade)
+```bash
+# 1. Create subscription on Jan 3
+curl -X POST http://localhost:3000/api/stripe/checkout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "planId": "professional",
+    "billingCycle": "monthly"
+  }'
+
+# 2. Complete Stripe checkout
+
+# 3. Preview downgrade on Jan 6
+curl -X POST http://localhost:3000/api/subscriptions/preview-change \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subscriptionId": "sub_def456",
+    "newPlanId": "professional"
+  }'
+
+# 4. Execute downgrade
+curl -X POST http://localhost:3000/api/subscriptions/change-plan \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subscriptionId": "sub_def456",
+    "newPlanId": "professional"
+  }'
+```
+
+---
+
+### Proration Formula Reference
+
+**Upgrade Proration:**
+```
+Immediate Charge = (New Price - Old Price) × (Days Remaining / Days in Period)
+
+Example (Jan 2 → Jan 4 upgrade):
+= ($99 - $49) × (29/31)
+= $50 × 0.935
+= $46.75 (Stripe's actual calculation may vary slightly)
+```
+
+**Downgrade Proration:**
+```
+Credit = (Old Price - New Price) × (Days Remaining / Days in Period)
+
+Example (Jan 3 → Jan 6 downgrade):
+= ($299 - $99) × (28/31)
+= $200 × 0.903
+= $180.60 (Stripe's actual calculation may vary slightly)
+```
+
+**Note:** Stripe's proration calculation accounts for the exact timestamp of changes, not just dates, so amounts may differ slightly from simple day-based calculations.
+
+---
+
+This implementation ensures fair, transparent, and automated handling of subscription changes while maintaining data integrity and providing excellent customer experience!
