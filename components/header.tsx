@@ -13,7 +13,7 @@ export function Header() {
 
   const handleAnchorClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
-    hash: string
+    hash: string,
   ) => {
     // If we're on the home page, use smooth scroll
     if (pathname === "/") {
@@ -65,6 +65,12 @@ export function Header() {
                     Pricing
                   </Link>
                   <Link
+                    href="/releases"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Release Notes
+                  </Link>
+                  <Link
                     href="/contact"
                     className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -86,6 +92,12 @@ export function Header() {
                     Pricing
                   </Link>
                   <Link
+                    href="/releases"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Release Notes
+                  </Link>
+                  <Link
                     href="/contact"
                     className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -98,18 +110,20 @@ export function Header() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <Button 
-                  variant="ghost" 
-                  asChild 
+                <Button
+                  variant="ghost"
+                  asChild
                   className="hidden sm:inline-flex border border-border bg-background shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <Link href={
-                    session?.user?.role === "admin" || 
-                    session?.user?.role === "support" || 
-                    session?.user?.role === "developer" 
-                      ? "/admin" 
-                      : "/dashboard"
-                  }>
+                  <Link
+                    href={
+                      session?.user?.role === "admin" ||
+                      session?.user?.role === "support" ||
+                      session?.user?.role === "developer"
+                        ? "/admin"
+                        : "/dashboard"
+                    }
+                  >
                     Go to Dashboard
                   </Link>
                 </Button>
@@ -119,7 +133,11 @@ export function Header() {
               </>
             ) : (
               <>
-                <Button variant="ghost" asChild className="hidden sm:inline-flex">
+                <Button
+                  variant="ghost"
+                  asChild
+                  className="hidden sm:inline-flex"
+                >
                   <Link href="/login">Log in</Link>
                 </Button>
                 <Button asChild>
