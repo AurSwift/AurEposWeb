@@ -393,21 +393,14 @@ export default async function CustomerDetailPage({
                       <Badge
                         variant="outline"
                         className={
-                          license.status === "active"
+                          license.isActive
                             ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : license.status === "expired"
-                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                         }
                       >
-                        {license.status}
+                        {license.isActive ? "active" : "inactive"}
                       </Badge>
                     </div>
-                    {license.machineId && (
-                      <div className="text-sm text-muted-foreground">
-                        Machine: {license.machineId}
-                      </div>
-                    )}
                     {license.expiresAt && (
                       <div className="text-xs text-muted-foreground">
                         Expires: {new Date(license.expiresAt).toLocaleDateString()}
@@ -466,7 +459,7 @@ export default async function CustomerDetailPage({
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {ticket.description?.toString().substring(0, 100)}...
+                      {ticket.message?.toString().substring(0, 100)}...
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Created:{" "}
@@ -558,10 +551,10 @@ export default async function CustomerDetailPage({
                 >
                   <div className="space-y-1">
                     <div className="font-medium">
-                      Invoice #{invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                      Invoice #{invoice.number || invoice.id.slice(0, 8)}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      ${invoice.amount} • {invoice.currency?.toUpperCase()}
+                      ${(invoice.amountPaid || 0) / 100} • {invoice.currency?.toUpperCase()}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {invoice.createdAt

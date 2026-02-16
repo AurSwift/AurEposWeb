@@ -1431,3 +1431,77 @@ export type TerminalCoordinationEvent =
   typeof terminalCoordinationEvents.$inferSelect;
 export type NewTerminalCoordinationEvent =
   typeof terminalCoordinationEvents.$inferInsert;
+
+// ============================================================================
+// RELEASE MANAGEMENT
+// ============================================================================
+
+/**
+ * Releases Table
+ * Stores all product release notes and version information
+ */
+export const releases = pgTable(
+  "releases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    version: varchar("version", { length: 50 }).notNull().unique(),
+    releaseDate: timestamp("release_date", { withTimezone: true }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    summary: text("summary").notNull(),
+    imageUrl: varchar("image_url", { length: 500 }),
+    isMajor: boolean("is_major").notNull().default(false),
+    type: varchar("type", { length: 20 }).notNull().default("minor"),
+    features: jsonb("features").default([]),
+    improvements: jsonb("improvements").default([]),
+    fixes: jsonb("fixes").default([]),
+    published: boolean("published").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    versionIdx: index("releases_version_idx").on(table.version),
+    releaseDateIdx: index("releases_release_date_idx").on(table.releaseDate),
+    publishedIdx: index("releases_published_idx").on(table.published),
+  })
+);
+
+/**
+ * Release Images Table
+ * Stores uploaded images for releases
+ */
+export const releaseImages = pgTable(
+  "release_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    filename: varchar("filename", { length: 255 }).notNull(),
+    storedFilename: varchar("stored_filename", { length: 255 })
+      .notNull()
+      .unique(),
+    filePath: varchar("file_path", { length: 500 }).notNull(),
+    publicUrl: varchar("public_url", { length: 500 }).notNull(),
+    mimeType: varchar("mime_type", { length: 100 }).notNull(),
+    fileSize: integer("file_size").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    uploadedBy: uuid("uploaded_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    storedFilenameIdx: index("release_images_stored_filename_idx").on(
+      table.storedFilename
+    ),
+  })
+);
+
+// Release Management Types
+export type Release = typeof releases.$inferSelect;
+export type NewRelease = typeof releases.$inferInsert;
+export type ReleaseImage = typeof releaseImages.$inferSelect;
+export type NewReleaseImage = typeof releaseImages.$inferInsert;

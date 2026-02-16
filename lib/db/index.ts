@@ -16,6 +16,9 @@ function getDb() {
   if (!_db) {
     _client = postgres(process.env.DATABASE_URL, {
       prepare: false,
+      // Supabase cold start can take 30–60s; allow enough time to connect
+      connect_timeout: 60,
+      idle_timeout: 60,
     });
     _db = drizzle(_client, { schema });
   }

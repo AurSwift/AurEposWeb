@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,6 +16,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const { status } = await req.json();
 
     if (!["active", "suspended", "cancelled"].includes(status)) {
@@ -29,7 +30,7 @@ export async function PATCH(
     const [updatedCustomer] = await db
       .update(customers)
       .set({ status, updatedAt: new Date() })
-      .where(eq(customers.id, params.id))
+      .where(eq(customers.id, id))
       .returning();
 
     if (!updatedCustomer) {
