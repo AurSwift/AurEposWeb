@@ -15,7 +15,6 @@
     "db:studio": "drizzle-kit studio",
     "db:cleanup": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local",
     "db:cleanup:dry-run": "tsx -r dotenv/config scripts/db/cleanup-database.ts dotenv_config_path=.env.local --dry-run",
-    "db:count": "tsx -r dotenv/config scripts/db/count-db-records.ts dotenv_config_path=.env.local",
     "db:drop-tables": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local",
     "db:drop-tables:dry-run": "tsx -r dotenv/config scripts/db/drop-all-tables.ts dotenv_config_path=.env.local --dry-run",
     "admin:create": "tsx --env-file=.env.local scripts/create-admin-user.ts",
