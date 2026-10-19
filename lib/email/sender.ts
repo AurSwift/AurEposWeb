@@ -1,5 +1,4 @@
 import { createTransporter, getFromEmail } from "../email";
-import type { Transporter } from "nodemailer";
 
 /**
  * Email sending utilities

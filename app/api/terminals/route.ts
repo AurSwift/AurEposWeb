@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import {
   subscriptions,
@@ -11,7 +10,7 @@ import { requireAuth } from "@/lib/api/auth-helpers";
 import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
 import { successResponse, handleApiError } from "@/lib/api/response-helpers";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);

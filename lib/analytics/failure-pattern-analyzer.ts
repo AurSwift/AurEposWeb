@@ -9,12 +9,10 @@
 import { db } from "@/lib/db";
 import {
   eventAcknowledgments,
-  deadLetterQueue,
-  eventRetryHistory,
   failurePatterns,
   type NewFailurePattern,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, sql, desc } from "drizzle-orm";
 
 /**
  * Pattern Detection Configuration

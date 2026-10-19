@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,6 @@ function calculateAnnualSavings(plan: Plan): number {
 type Step = "account" | "verification" | "plan" | "billing";
 
 function SignupPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const [step, setStep] = useState<Step>("account");
@@ -140,7 +139,7 @@ function SignupPageContent() {
 
       // Move to verification pending step (DO NOT auto-login)
       setStep("verification");
-    } catch (err) {
+    } catch {
       setError("Something went wrong");
     } finally {
       setIsLoading(false);
@@ -185,7 +184,7 @@ function SignupPageContent() {
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (err) {
+    } catch {
       setError("Failed to start checkout");
     } finally {
       setIsLoading(false);

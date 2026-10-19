@@ -52,8 +52,14 @@ type CancelType = "end_of_period" | "immediately";
 
 export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
   const router = useRouter();
-  const [subscription, setSubscription] = useState<any>(null);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscription, setSubscription] = useState<{
+    id: string;
+    planId: PlanId;
+    billingCycle: BillingCycle;
+    trialEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+    status: string;
+  } | null>(null);
   const [cancelType, setCancelType] = useState<CancelType>("end_of_period");
   const [cancelReason, setCancelReason] = useState("");
   const [newPlanId, setNewPlanId] = useState<PlanId>("basic");
@@ -78,8 +84,6 @@ export function SubscriptionActions({ onUpdate }: SubscriptionActionsProps) {
         }
       } catch (error) {
         console.error("Failed to fetch subscription:", error);
-      } finally {
-        setSubscriptionLoading(false);
       }
     }
     fetchSubscription();

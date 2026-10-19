@@ -10,8 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/api/auth-helpers";
-import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
-import { successResponse, handleApiError } from "@/lib/api/response-helpers";
+import { handleApiError } from "@/lib/api/response-helpers";
 
 /**
  * Data Export API - GDPR Article 20 Compliance (Right to Data Portability)

@@ -7,10 +7,9 @@ import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
 import {
   successResponse,
   handleApiError,
-  ValidationError,
 } from "@/lib/api/response-helpers";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);

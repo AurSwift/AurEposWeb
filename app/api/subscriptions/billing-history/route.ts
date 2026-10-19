@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { invoices, subscriptions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -7,7 +6,7 @@ import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
 import { successResponse, handleApiError } from "@/lib/api/response-helpers";
 import { getPlanDisplayName } from "@/lib/stripe/plan-utils";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);

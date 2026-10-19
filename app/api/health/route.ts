@@ -5,15 +5,15 @@
  * Returns 200 OK if the server is up and running.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     status: "ok",
     timestamp: new Date().toISOString(),
   });
 }
 
-export async function HEAD(_request: NextRequest) {
+export async function HEAD() {
   return new NextResponse(null, { status: 200 });
 }

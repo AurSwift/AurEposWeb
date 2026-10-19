@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,57 +30,49 @@ function VerifyEmailContent() {
     "verifying" | "success" | "error" | "already-verified" | "no-token"
   >("verifying");
   const [error, setError] = useState("");
-  const [email, setEmail] = useState("");
-
   useEffect(() => {
-    if (!token) {
-      setStatus("no-token");
-      return;
-    }
+    if (!token) return;
 
-    verifyEmail(token);
-  }, [token]);
+    let active = true;
+    let redirectTimeout: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
 
-  const verifyEmail = async (verificationToken: string) => {
-    try {
-      const response = await fetch(
-        `/api/auth/verify-email?token=${verificationToken}`
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Verification failed");
+    fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => ({ response, data: await response.json() }))
+      .then(({ response, data }) => {
+        if (!active) return;
+        if (!response.ok) {
+          setError(data.error || "Verification failed");
+          setStatus("error");
+        } else if (data.alreadyVerified) {
+          setStatus("already-verified");
+        } else {
+          setStatus("success");
+          redirectTimeout = setTimeout(() => {
+            router.push(
+              `/login?callbackUrl=${encodeURIComponent("/signup?step=plan&verified=true")}&verified=true&email=${encodeURIComponent(data.email)}`
+            );
+          }, 2500);
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error("Verification error:", err);
+        setError("Something went wrong. Please try again.");
         setStatus("error");
-        return;
-      }
+      });
 
-      // Check if already verified
-      if (data.alreadyVerified) {
-        setStatus("already-verified");
-        setEmail(data.email);
-        return;
-      }
-
-      // Email verified successfully
-      setEmail(data.email);
-      setStatus("success");
-
-      // Redirect to login page with callback to plan selection
-      // User needs to log in to have an active session for the checkout flow
-      setTimeout(() => {
-        router.push(
-          `/login?callbackUrl=${encodeURIComponent("/signup?step=plan&verified=true")}&verified=true&email=${encodeURIComponent(data.email)}`
-        );
-      }, 2500);
-    } catch (err) {
-      console.error("Verification error:", err);
-      setError("Something went wrong. Please try again.");
-      setStatus("error");
-    }
-  };
+    return () => {
+      active = false;
+      controller.abort();
+      if (redirectTimeout) clearTimeout(redirectTimeout);
+    };
+  }, [token, router]);
 
   // No token provided
-  if (status === "no-token") {
+  if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background relative overflow-hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />

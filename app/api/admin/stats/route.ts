@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireInternalUser } from "@/lib/api/auth-helpers";
 import { handleApiError } from "@/lib/api/response-helpers";
 import { db } from "@/lib/db";
@@ -9,7 +9,7 @@ import { sql, eq, gte } from "drizzle-orm";
  * GET /api/admin/stats
  * Get admin dashboard statistics
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await requireInternalUser();
 

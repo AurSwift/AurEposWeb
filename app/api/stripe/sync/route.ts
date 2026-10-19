@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api/auth-helpers";
 import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
 import { successResponse, handleApiError } from "@/lib/api/response-helpers";
 import { stripe } from "@/lib/stripe/client";
 import { db } from "@/lib/db";
 import { paymentMethods, invoices, subscriptions, payments } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { createPaymentFromInvoice } from "@/lib/db/payment-helpers";
 
@@ -13,7 +13,7 @@ import { createPaymentFromInvoice } from "@/lib/db/payment-helpers";
  * POST /api/stripe/sync
  * Syncs existing payment methods and invoices from Stripe to database
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);
@@ -96,8 +96,12 @@ export async function POST(request: NextRequest) {
     });
 
     for (const invoice of invoicesList.data) {
-      // Cast to any to access properties that exist at runtime but aren't in TypeScript definitions
-      const invoiceAny = invoice as any;
+      // Older invoice fields can still be present in Stripe responses.
+      const invoiceAny = invoice as Stripe.Invoice & {
+        subscription?: string | Stripe.Subscription | null;
+        tax?: number | null;
+        payment_intent?: string | { id: string } | null;
+      };
       
       // Find subscription if exists
       let subscriptionId: string | null = null;

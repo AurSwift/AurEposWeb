@@ -53,7 +53,7 @@ export function PaymentMethodCard() {
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to open billing portal",

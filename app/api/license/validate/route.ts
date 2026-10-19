@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateLicense } from "@/lib/license/validator";
 import {
-  applyRateLimit,
-  getClientIP,
   addRateLimitHeaders,
   createRateLimitKey,
   checkRateLimit,

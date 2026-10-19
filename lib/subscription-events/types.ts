@@ -164,7 +164,7 @@ export interface CoordinationEvent extends BaseSubscriptionEvent {
     | "primary_changed"
     | "state_sync"
     | "deactivation_broadcast";
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 /**

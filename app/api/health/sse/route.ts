@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { isRedisConfigured, isRedisHealthy, getRedisStatus } from "@/lib/redis";
+import { getRedisStatus } from "@/lib/redis";
 
 export async function GET() {
   const status = await getRedisStatus();

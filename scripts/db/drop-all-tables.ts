@@ -28,7 +28,6 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 // Now import after env is loaded
-import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import * as readline from "readline";
 

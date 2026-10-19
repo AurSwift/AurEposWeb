@@ -3,7 +3,8 @@ import { stripe } from "@/lib/stripe/client";
 import { db } from "@/lib/db";
 import { subscriptions, licenseKeys, customers } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getPlan } from "@/lib/stripe/plans";
+import { getPlan, type PlanId, type BillingCycle } from "@/lib/stripe/plans";
+import { isValidPlanId } from "@/lib/stripe/plan-utils";
 import { generateLicenseKey } from "@/lib/license/generator";
 import type Stripe from "stripe";
 import { requireAuth } from "@/lib/api/auth-helpers";
@@ -129,9 +130,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Get plan details from metadata
-    const planId = (checkoutSession.metadata?.planId || "basic") as any;
-    const billingCycle = (checkoutSession.metadata?.billingCycle ||
-      "monthly") as any;
+    const planIdValue = checkoutSession.metadata?.planId || "basic";
+    if (!isValidPlanId(planIdValue)) {
+      throw new ValidationError("Invalid plan ID in checkout session");
+    }
+    const planId: PlanId = planIdValue;
+    const billingCycleValue = checkoutSession.metadata?.billingCycle || "monthly";
+    if (billingCycleValue !== "monthly" && billingCycleValue !== "annual") {
+      throw new ValidationError("Invalid billing cycle in checkout session");
+    }
+    const billingCycle: BillingCycle = billingCycleValue;
 
     const plan = await getPlan(planId);
     const price =

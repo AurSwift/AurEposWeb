@@ -10,8 +10,6 @@ import { eq, and, sql, count } from "drizzle-orm";
 import {
   CODE_TO_PLAN,
   LICENSE_KEY_FORMAT,
-  MAX_DEACTIVATIONS,
-  HEARTBEAT_TIMEOUT_MS,
 } from "./constants";
 
 // ============================================================================
@@ -22,7 +20,6 @@ import {
 const LICENSE_KEY_PATTERN = LICENSE_KEY_FORMAT;
 
 // HMAC secret for license key validation (must be set in environment)
-const LICENSE_HMAC_SECRET = process.env.LICENSE_HMAC_SECRET;
 
 // Plan codes mapping (from constants)
 const PLAN_CODES = CODE_TO_PLAN;

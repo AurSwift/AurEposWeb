@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/client";
 import { db } from "@/lib/db";
 import { webhookEvents } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import {
   shouldRetryError,

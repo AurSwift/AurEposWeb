@@ -795,9 +795,7 @@ export async function handleSubscriptionUpdated(
 
   // 2. Notify about plan change (if price changed)
   const currentPriceId = subscription.items.data[0]?.price.id;
-  const previousPriceId = (existingSubscription.metadata as any)?.stripePriceId as
-    | string
-    | undefined;
+  const previousPriceId = (existingSubscription.metadata as { stripePriceId?: string } | null)?.stripePriceId;
 
   if (currentPriceId && previousPriceId && currentPriceId !== previousPriceId) {
     // Plan changed - detect which plans
@@ -820,9 +818,6 @@ export async function handleSubscriptionUpdated(
       const { publishPlanChanged } = await import("@/lib/subscription-events");
 
       for (const licenseKey of licenseKeysList) {
-        const { getPlan } = await import("@/lib/stripe/plans");
-        const newPlan = await getPlan(newPlanId);
-
         publishPlanChanged(licenseKey, {
           previousPlanId,
           newPlanId,

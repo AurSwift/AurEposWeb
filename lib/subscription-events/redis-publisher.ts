@@ -222,7 +222,7 @@ export function getSubscriberCount(licenseKey: string): number {
 export function publishGenericEvent(
   licenseKey: string,
   eventType: SubscriptionEventType,
-  data: any
+  data: Record<string, unknown>
 ): void {
   const event = createSubscriptionEvent(eventType, licenseKey, data);
   publishEventSync(event);

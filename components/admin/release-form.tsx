@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, X, Upload } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { IconPicker } from "@/components/admin/icon-picker";
 import Link from "next/link";
@@ -63,7 +63,20 @@ const releaseFormSchema = z.object({
 type ReleaseFormValues = z.infer<typeof releaseFormSchema>;
 
 interface ReleaseFormProps {
-  initialData?: any;
+  initialData?: {
+    id: string;
+    version: string;
+    releaseDate: string | Date;
+    title: string;
+    summary: string;
+    imageUrl: string | null;
+    isMajor: boolean;
+    type: string;
+    features: unknown;
+    improvements: unknown;
+    fixes: unknown;
+    published: boolean;
+  };
 }
 
 export function ReleaseForm({ initialData }: ReleaseFormProps) {
@@ -83,7 +96,9 @@ export function ReleaseForm({ initialData }: ReleaseFormProps) {
           summary: initialData.summary,
           imageUrl: initialData.imageUrl || "",
           isMajor: initialData.isMajor || false,
-          type: initialData.type || "minor",
+          type: initialData.type === "major" || initialData.type === "patch"
+            ? initialData.type
+            : "minor",
           features: Array.isArray(initialData.features) && initialData.features.length > 0
             ? initialData.features
             : [],
@@ -166,11 +181,11 @@ export function ReleaseForm({ initialData }: ReleaseFormProps) {
 
       router.push("/admin/releases");
       router.refresh();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving release:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save release",
+        description: error instanceof Error ? error.message : "Failed to save release",
         variant: "destructive",
       });
     } finally {

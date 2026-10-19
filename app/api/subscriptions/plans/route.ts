@@ -31,13 +31,16 @@ export async function GET(request: NextRequest) {
     // Remove sensitive Stripe IDs for client-side
     const clientPlans: Record<string, ClientPlan> = {};
     Object.entries(plans).forEach(([planId, plan]) => {
-      const {
-        stripePriceIdMonthly: _,
-        stripePriceIdAnnual: __,
-        stripeProductId: ___,
-        ...clientPlan
-      } = plan;
-      clientPlans[planId] = clientPlan;
+      clientPlans[planId] = {
+        id: plan.id,
+        name: plan.name,
+        description: plan.description,
+        priceMonthly: plan.priceMonthly,
+        priceAnnual: plan.priceAnnual,
+        annualDiscountPercent: plan.annualDiscountPercent,
+        features: plan.features,
+        popular: plan.popular,
+      };
     });
 
     const response = NextResponse.json({

@@ -68,7 +68,8 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
       )
     : POPULAR_ICONS;
 
-  const Icon = (LucideIcons as any)[value] || LucideIcons.Sparkles;
+  const icons = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
+  const Icon = icons[value] || LucideIcons.Sparkles;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -92,7 +93,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
           <ScrollArea className="h-64">
             <div className="grid grid-cols-6 gap-2">
               {filteredIcons.map((iconName) => {
-                const IconComponent = (LucideIcons as any)[iconName];
+                const IconComponent = icons[iconName];
                 return (
                   <Button
                     key={iconName}

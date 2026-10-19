@@ -8,7 +8,7 @@ import {
   subscriptionChanges,
   activations,
 } from "@/lib/db/schema";
-import { eq, and, or, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   getStripePriceId,
   getPlan,
@@ -124,14 +124,19 @@ export async function POST(request: NextRequest) {
     let invoiceUrl: string | null = null;
 
     try {
-      const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
+      const upcomingInvoice = await (stripe.invoices as unknown as {
+        retrieveUpcoming: (params: {
+          customer: string;
+          subscription: string;
+        }) => Promise<Stripe.Invoice>;
+      }).retrieveUpcoming({
         customer: currentSub.stripeCustomerId!,
         subscription: currentSub.stripeSubscriptionId,
       }) as Stripe.Invoice;
 
       // Calculate proration from invoice lines
       const prorationLines = upcomingInvoice.lines.data.filter(
-        (line) => (line as any).proration
+        (line) => "proration" in line && line.proration === true
       );
 
       const prorationAmountCents = prorationLines.reduce(
@@ -145,7 +150,9 @@ export async function POST(request: NextRequest) {
       // Check if there's an immediate invoice for the proration
       if (upcomingInvoice.id && upcomingInvoice.id !== "upcoming") {
         // Handle payment_intent which can be string, PaymentIntent object, or null
-        const paymentIntent = (upcomingInvoice as any).payment_intent;
+        const paymentIntent = (upcomingInvoice as Stripe.Invoice & {
+          payment_intent?: string | { id: string } | null;
+        }).payment_intent;
         stripePaymentId =
           typeof paymentIntent === "string"
             ? paymentIntent
@@ -174,7 +181,7 @@ export async function POST(request: NextRequest) {
     let newLicenseKey: string | null = null;
     await db.transaction(async (tx) => {
       // Update subscription and increment trial plan changes if in trial
-      const updateData: any = {
+      const updateData: Partial<typeof subscriptions.$inferInsert> = {
         planId: newPlanId,
         billingCycle,
         price: newPrice.toString(),
@@ -259,7 +266,7 @@ export async function POST(request: NextRequest) {
       newLicenseKey = generateLicenseKey(newPlanId, customer.id);
 
       // Create new license key
-      const [insertedLicense] = await tx.insert(licenseKeys).values({
+      await tx.insert(licenseKeys).values({
         customerId: customer.id,
         subscriptionId,
         licenseKey: newLicenseKey,
@@ -293,8 +300,8 @@ export async function POST(request: NextRequest) {
         subscriptionId,
         prorationAmount,
         currency,
-        new Date((updatedSubscription as any).current_period_start * 1000),
-        new Date((updatedSubscription as any).current_period_end * 1000),
+        new Date(updatedSubscription.items.data[0].current_period_start * 1000),
+        new Date(updatedSubscription.items.data[0].current_period_end * 1000),
         stripePaymentId,
         invoiceUrl,
         tx

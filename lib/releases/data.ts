@@ -17,7 +17,7 @@ import type {
 /**
  * Map database release to CustomerReleaseNote format
  */
-function mapDbReleaseToCustomerNote(dbRelease: any): CustomerReleaseNote {
+function mapDbReleaseToCustomerNote(dbRelease: typeof releases.$inferSelect): CustomerReleaseNote {
   return {
     version: dbRelease.version,
     date: dbRelease.releaseDate.toISOString().split("T")[0], // Format as YYYY-MM-DD

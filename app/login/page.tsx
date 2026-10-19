@@ -20,27 +20,21 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => searchParams?.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showVerifiedMessage, setShowVerifiedMessage] = useState(false);
+  const [showVerifiedMessage, setShowVerifiedMessage] = useState(
+    () => searchParams?.get("verified") === "true"
+  );
   const [showPassword, setShowPassword] = useState(false);
 
-  // Check if redirected from email verification
+  // Hide the verification message after 10 seconds.
   useEffect(() => {
-    const verified = searchParams?.get("verified");
-    const emailParam = searchParams?.get("email");
-
-    if (verified === "true") {
-      setShowVerifiedMessage(true);
-      if (emailParam) {
-        setEmail(decodeURIComponent(emailParam));
-      }
-      // Hide message after 10 seconds
-      setTimeout(() => setShowVerifiedMessage(false), 10000);
-    }
-  }, [searchParams]);
+    if (!showVerifiedMessage) return;
+    const timeout = window.setTimeout(() => setShowVerifiedMessage(false), 10000);
+    return () => window.clearTimeout(timeout);
+  }, [showVerifiedMessage]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

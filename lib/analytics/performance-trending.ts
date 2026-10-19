@@ -14,7 +14,7 @@ import {
   performanceMetrics,
   type NewPerformanceMetric,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 
 /**
  * Performance Trend Result Interface

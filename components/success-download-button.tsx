@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -40,13 +40,6 @@ export function SuccessDownloadButton() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  // Fetch release data when dialog opens
-  useEffect(() => {
-    if (open && !releaseInfo && !isLoading) {
-      fetchReleaseData();
-    }
-  }, [open]);
-
   // Set default platform when data is available
   useEffect(() => {
     if (releaseInfo && releaseInfo.downloads.length > 0 && !selectedPlatform) {
@@ -60,7 +53,7 @@ export function SuccessDownloadButton() {
     }
   }, [releaseInfo, selectedPlatform]);
 
-  const fetchReleaseData = async () => {
+  const fetchReleaseData = useCallback(async () => {
     setIsLoading(true);
     setError(undefined);
 
@@ -84,7 +77,14 @@ export function SuccessDownloadButton() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Fetch release data when dialog opens.
+  useEffect(() => {
+    if (open && !releaseInfo && !isLoading && !error) {
+      void fetchReleaseData();
+    }
+  }, [open, releaseInfo, isLoading, error, fetchReleaseData]);
 
   const handleDownload = () => {
     if (!releaseInfo || !selectedPlatform) return;
@@ -101,19 +101,14 @@ export function SuccessDownloadButton() {
     }
   };
 
-  const handleDirectDownload = () => {
-    // If we already have data and a single option, download directly
-    if (releaseInfo && releaseInfo.downloads.length === 1) {
-      const download = releaseInfo.downloads[0];
-      window.open(download.url, "_blank", "noopener,noreferrer");
-    } else {
-      // Otherwise open the dialog
-      setOpen(true);
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) setError(undefined);
+      }}
+    >
       <DialogTrigger asChild>
         <Button className="flex-1">
           <Download className="mr-2 h-4 w-4" />

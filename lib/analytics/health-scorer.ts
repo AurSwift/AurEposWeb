@@ -16,11 +16,13 @@ import {
   deadLetterQueue,
   eventRetryHistory,
   licenseHealthMetrics,
-  failurePatterns,
   type NewLicenseHealthMetric,
 } from "@/lib/db/schema";
 import { eq, and, gte, sql, desc } from "drizzle-orm";
 import { getActiveFailurePatterns } from "./failure-pattern-analyzer";
+
+type ActiveFailurePattern = Awaited<ReturnType<typeof getActiveFailurePatterns>>[number];
+type EventStatistics = Awaited<ReturnType<typeof getEventStatistics>>;
 
 /**
  * Health Score Weights
@@ -355,8 +357,8 @@ function generateRecommendations(context: {
   failureFrequencyScore: number;
   recoveryScore: number;
   patternScore: number;
-  activePatterns: any[];
-  eventStats: any;
+  activePatterns: ActiveFailurePattern[];
+  eventStats: EventStatistics;
 }): string[] {
   const recommendations: string[] = [];
 
@@ -408,7 +410,7 @@ function generateRecommendations(context: {
  */
 async function storeHealthMetrics(
   result: HealthScoreResult,
-  activePatterns: any[]
+  activePatterns: ActiveFailurePattern[]
 ): Promise<void> {
   const metrics: NewLicenseHealthMetric = {
     licenseKey: result.licenseKey,

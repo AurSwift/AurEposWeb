@@ -1,4 +1,4 @@
-import { createTransporter, getFromEmail } from "@/lib/email";
+import { createTransporter } from "@/lib/email";
 
 /**
  * Trial Notification System

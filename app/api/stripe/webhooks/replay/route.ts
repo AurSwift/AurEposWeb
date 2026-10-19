@@ -3,7 +3,7 @@ import { requireInternalUser } from "@/lib/api/auth-helpers";
 import { handleApiError } from "@/lib/api/response-helpers";
 import { db } from "@/lib/db";
 import { webhookEvents } from "@/lib/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import {
   handleCheckoutCompleted,
   handleSubscriptionUpdated,

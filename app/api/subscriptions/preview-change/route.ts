@@ -95,7 +95,14 @@ export async function POST(request: NextRequest) {
 
       // Preview the invoice with the subscription item change
       // Note: retrieveUpcoming exists in Stripe API but TypeScript types may not include it
-      const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
+      const upcomingInvoice = await (stripe.invoices as unknown as {
+        retrieveUpcoming: (params: {
+          customer: string;
+          subscription: string;
+          subscription_items: { id: string; price: string }[];
+          subscription_proration_behavior: string;
+        }) => Promise<Stripe.Invoice>;
+      }).retrieveUpcoming({
         customer: currentSub.stripeCustomerId!,
         subscription: currentSub.stripeSubscriptionId,
         subscription_items: [
@@ -109,7 +116,7 @@ export async function POST(request: NextRequest) {
 
       // Calculate proration details
       const prorationLines = upcomingInvoice.lines.data.filter(
-        (line: any) => line.proration
+        (line) => "proration" in line && line.proration === true
       );
 
       const prorationAmountCents = prorationLines.reduce(

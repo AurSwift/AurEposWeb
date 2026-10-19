@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { customers, users } from "@/lib/db/schema";
+import { customers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { Customer } from "@/lib/db/schema";
 import type { Session } from "next-auth";

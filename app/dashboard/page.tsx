@@ -39,7 +39,7 @@ export default async function DashboardPage() {
       .from(customers)
       .where(eq(customers.userId, session.user.id))
       .limit(1);
-  } catch (error) {
+  } catch {
     // Database connection error - show user-friendly error page
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -66,7 +66,7 @@ export default async function DashboardPage() {
             </h2>
 
             <p className="text-muted-foreground mb-6 leading-relaxed">
-              We're experiencing issues connecting to our DB server. This is
+              We&apos;re experiencing issues connecting to our DB server. This is
               usually temporary and should be resolved shortly.
               <br />
               <br />
@@ -200,7 +200,7 @@ export default async function DashboardPage() {
       )
       .orderBy(desc(subscriptions.createdAt))
       .limit(1);
-  } catch (error) {
+  } catch {
     // If subscription query fails, continue with null subscription
     subscription = null;
   }
@@ -213,7 +213,7 @@ export default async function DashboardPage() {
       .where(eq(licenseKeys.customerId, customer.id))
       .orderBy(desc(licenseKeys.isActive), desc(licenseKeys.createdAt))
       .limit(1);
-  } catch (error) {
+  } catch {
     // If license key query fails, continue with null
     licenseKeyResult = null;
   }

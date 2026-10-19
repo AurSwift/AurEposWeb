@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Copy, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Copy, ExternalLink, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface LicenseKey {
@@ -100,7 +100,7 @@ export function SubscriptionDetails({
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: any; label: string }> = {
+    const variants: Record<string, { variant: React.ComponentProps<typeof Badge>["variant"]; label: string }> = {
       active: { variant: "default", label: "Active" },
       trialing: { variant: "secondary", label: "Trial" },
       past_due: { variant: "destructive", label: "Past Due" },
@@ -158,7 +158,7 @@ export function SubscriptionDetails({
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4">
-            You don't have an active subscription yet.
+            You don&apos;t have an active subscription yet.
           </p>
           <Button asChild>
             <a href="/pricing">View Plans</a>
@@ -219,7 +219,7 @@ export function SubscriptionDetails({
                 <p className="text-xs text-amber-700 dark:text-amber-300">
                   Your trial access continues until{" "}
                   {format(new Date(subscription.trialEnd), "MMM dd, yyyy")}.
-                  After that, you'll have a 7-day grace period to export your
+                  After that, you&apos;ll have a 7-day grace period to export your
                   data.
                 </p>
               </div>
@@ -242,7 +242,7 @@ export function SubscriptionDetails({
                     new Date(subscription.currentPeriodEnd),
                     "MMM dd, yyyy"
                   )}
-                  . You'll have a 7-day grace period after that to export your
+                  . You&apos;ll have a 7-day grace period after that to export your
                   data.
                 </p>
               </div>

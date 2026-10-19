@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { subscriptions, licenseKeys, activations } from "@/lib/db/schema";
-import { eq, and, or, desc, lt, sql } from "drizzle-orm";
+import { eq, and, or, desc, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/api/auth-helpers";
 import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
 import {
@@ -18,7 +17,7 @@ const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000;
  * GET /api/terminals/cleanup
  * Get count of stale terminals that would be cleaned up
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);
@@ -102,7 +101,7 @@ export async function GET(_request: NextRequest) {
  * POST /api/terminals/cleanup
  * Remove all stale terminals (inactive or offline > 24 hours)
  */
-export async function POST(_request: NextRequest) {
+export async function POST() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);

@@ -135,7 +135,7 @@ export default function SupportPage() {
           <Card>
             <CardHeader>
               <CardTitle>Submit a Support Ticket</CardTitle>
-              <CardDescription>Fill out the form below and we'll get back to you as soon as possible</CardDescription>
+              <CardDescription>Fill out the form below and we&apos;ll get back to you as soon as possible</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, CreditCard, AlertCircle, CheckCircle2, Crown, Zap, Shield } from "lucide-react"
+import { Calendar, CreditCard, AlertCircle, CheckCircle2, Crown, Zap } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, memo } from "react";
+import { useState, memo } from "react";
 import {
   Card,
   CardContent,
@@ -30,17 +30,15 @@ export function PlanCard({
   isSelected,
   selectedBillingCycle,
 }: PlanCardProps) {
-  const [localBillingCycle, setLocalBillingCycle] =
-    useState<BillingCycle>(billingCycle);
-
-  // Sync billing cycle with global state
-  useEffect(() => {
-    if (isSelected && selectedBillingCycle) {
-      setLocalBillingCycle(selectedBillingCycle);
-    } else {
-      setLocalBillingCycle(billingCycle);
-    }
-  }, [isSelected, selectedBillingCycle, billingCycle]);
+  const [billingCycleOverride, setBillingCycleOverride] = useState<{
+    cycle: BillingCycle;
+    baseCycle: BillingCycle;
+  } | null>(null);
+  const localBillingCycle = isSelected && selectedBillingCycle
+    ? selectedBillingCycle
+    : billingCycleOverride?.baseCycle === billingCycle
+      ? billingCycleOverride.cycle
+      : billingCycle;
 
   const isThisPlanSelected = isSelected && selectedBillingCycle === localBillingCycle;
 
@@ -50,7 +48,7 @@ export function PlanCard({
     localBillingCycle === "annual" ? calculateAnnualSavings(plan) : 0;
 
   const handleBillingCycleChange = (cycle: BillingCycle) => {
-    setLocalBillingCycle(cycle);
+    setBillingCycleOverride({ cycle, baseCycle: billingCycle });
     // Auto-select plan when billing cycle changes if this plan is already selected
     if (isSelected) {
       onSelect(plan.id, cycle);

@@ -104,7 +104,7 @@ export function VerificationPending({ email }: VerificationPendingProps) {
           <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
             <strong>Check your email!</strong>
             <br />
-            We've sent a verification link to{" "}
+            We&apos;ve sent a verification link to{" "}
             <strong>{maskEmail(email)}</strong>
           </AlertDescription>
         </Alert>
@@ -115,7 +115,7 @@ export function VerificationPending({ email }: VerificationPendingProps) {
               Click the link in the email to verify your account and continue.
             </p>
             <p className="text-xs text-muted-foreground">
-              Didn't receive the email? Check your spam folder or resend the
+              Didn&apos;t receive the email? Check your spam folder or resend the
               verification email.
             </p>
           </div>

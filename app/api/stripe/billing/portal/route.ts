@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { stripe } from "@/lib/stripe/client";
 import { requireAuth } from "@/lib/api/auth-helpers";
 import { getCustomerOrThrow } from "@/lib/db/customer-helpers";
@@ -8,7 +7,7 @@ import {
   ValidationError,
 } from "@/lib/api/response-helpers";
 
-export async function POST(_request: NextRequest) {
+export async function POST() {
   try {
     const session = await requireAuth();
     const customer = await getCustomerOrThrow(session.user.id);

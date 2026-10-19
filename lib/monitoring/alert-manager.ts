@@ -7,7 +7,6 @@ import {
   Alert,
   AlertSeverity,
   AlertType,
-  ALERT_CHANNELS,
   getEnabledChannels,
 } from "./alert-config";
 

@@ -11,7 +11,6 @@ import {
 } from "./db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import type { User } from "./db/schema";
-import { getPlan } from "./stripe/plans";
 
 // Type exports for compatibility
 export interface UserSubscription {

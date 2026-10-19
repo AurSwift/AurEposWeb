@@ -89,7 +89,7 @@ export function CustomerStatusManager({
         <DialogHeader>
           <DialogTitle>Update Customer Status</DialogTitle>
           <DialogDescription>
-            Change the customer's account status. This will affect their access to
+            Change the customer&apos;s account status. This will affect their access to
             services.
           </DialogDescription>
         </DialogHeader>

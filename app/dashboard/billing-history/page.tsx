@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,7 @@ export default function BillingHistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchBillingHistory();
-  }, []);
-
-  const fetchBillingHistory = async () => {
+  const fetchBillingHistory = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/subscriptions/billing-history");
@@ -54,7 +50,11 @@ export default function BillingHistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    void fetchBillingHistory();
+  }, [fetchBillingHistory]);
 
   const handleDownloadInvoice = (invoice: Invoice) => {
     if (invoice.invoiceUrl) {

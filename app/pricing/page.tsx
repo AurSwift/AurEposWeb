@@ -22,6 +22,12 @@ import { type PlanId, type BillingCycle, type Plan } from "@/lib/stripe/plans";
 import { calculateAnnualSavings } from "@/lib/stripe/plan-utils";
 import { useSession } from "next-auth/react";
 
+declare global {
+  interface Window {
+    gtag?: (command: string, eventName: string, parameters: Record<string, unknown>) => void;
+  }
+}
+
 function PricingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -112,8 +118,8 @@ function PricingPageContent() {
     setFormData({ ...formData, planId, billingCycle });
     
     // Track selection event (if analytics is available)
-    if (typeof window !== "undefined" && (window as any).gtag) {
-      (window as any).gtag("event", "plan_selected", {
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "plan_selected", {
         plan_id: planId,
         billing_cycle: billingCycle,
         price:
@@ -179,8 +185,8 @@ function PricingPageContent() {
       // Redirect to Stripe Checkout
       if (data.url) {
         // Track checkout initiation
-        if (typeof window !== "undefined" && (window as any).gtag) {
-          (window as any).gtag("event", "begin_checkout", {
+        if (typeof window !== "undefined" && window.gtag) {
+          window.gtag("event", "begin_checkout", {
             plan_id: formData.planId,
             billing_cycle: formData.billingCycle,
             value: price,
@@ -246,7 +252,7 @@ function PricingPageContent() {
                   <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-xl font-semibold mb-2">No Plans Available</h3>
                   <p className="text-muted-foreground mb-4">
-                    We couldn't load our pricing plans. Please try again later.
+                    We couldn&apos;t load our pricing plans. Please try again later.
                   </p>
                   <Button onClick={() => window.location.reload()}>
                     Refresh Page

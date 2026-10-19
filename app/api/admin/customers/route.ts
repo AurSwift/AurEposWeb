@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireInternalUser } from "@/lib/api/auth-helpers";
 import { handleApiError } from "@/lib/api/response-helpers";
 import { db } from "@/lib/db";
-import { customers, users, subscriptions } from "@/lib/db/schema";
+import { customers, users } from "@/lib/db/schema";
 import { eq, desc, like, or } from "drizzle-orm";
 
 /**

@@ -18,8 +18,9 @@ import {
   type NewTerminalStateSync,
   type NewTerminalCoordinationEvent,
 } from "@/lib/db/schema";
-import { eq, and, gte, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { publishGenericEvent } from "@/lib/subscription-events/redis-publisher";
+import type { SubscriptionEventType } from "@/lib/subscription-events/types";
 
 /**
  * Terminal Info Interface
@@ -190,7 +191,7 @@ export async function deactivateAllTerminals(
     .where(eq(terminalSessions.licenseKey, licenseKey));
 
   // Broadcast deactivation event to all terminals
-  publishGenericEvent(licenseKey, "deactivation_broadcast" as any, {
+  publishGenericEvent(licenseKey, "deactivation_broadcast", {
     reason: "license_deactivated",
     timestamp: new Date().toISOString(),
   });
@@ -228,7 +229,7 @@ export async function getAllTerminals(licenseKey: string) {
  */
 export async function broadcastToAllTerminals(
   licenseKey: string,
-  eventType: string,
+  eventType: SubscriptionEventType,
   payload: Record<string, unknown>
 ): Promise<void> {
   const terminals = await getActiveTerminals(licenseKey);
@@ -251,7 +252,7 @@ export async function broadcastToAllTerminals(
   await db.insert(terminalCoordinationEvents).values(event);
 
   // Publish via SSE to all terminals
-  publishGenericEvent(licenseKey, eventType as any, payload);
+  publishGenericEvent(licenseKey, eventType, payload);
 }
 
 /**
@@ -348,27 +349,6 @@ async function promoteNewPrimaryTerminal(licenseKey: string): Promise<void> {
     newPrimaryMachineIdHash: newPrimary.machineIdHash,
     terminalName: newPrimary.terminalName,
   });
-}
-
-/**
- * Publish Terminal Event
- */
-async function publishTerminalEvent(
-  licenseKey: string,
-  eventType: string,
-  payload: Record<string, unknown>
-): Promise<void> {
-  const event: NewTerminalCoordinationEvent = {
-    licenseKey,
-    eventType,
-    payload,
-    isBroadcast: true,
-  };
-
-  await db.insert(terminalCoordinationEvents).values(event);
-
-  // Also publish via SSE
-  publishGenericEvent(licenseKey, eventType as any, payload);
 }
 
 /**

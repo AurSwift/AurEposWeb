@@ -38,7 +38,7 @@ type DataTableProps<T> = {
   emptyMessage?: string;
 };
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends object>({
   columns,
   data,
   searchPlaceholder = "Search...",
@@ -71,7 +71,7 @@ export function DataTable<T extends Record<string, any>>({
     Object.entries(filters).forEach(([key, value]) => {
       if (value && value !== "all") {
         result = result.filter((item) => {
-          const itemValue = item[key];
+          const itemValue = item[key as keyof T];
           return itemValue == null ? false : String(itemValue) === value;
         });
       }

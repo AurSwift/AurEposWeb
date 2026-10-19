@@ -8,7 +8,7 @@ import {
   invoices,
   terminalSessions,
 } from "@/lib/db/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,6 @@ import {
   LifeBuoy,
   Activity,
   UserCheck,
-  AlertCircle,
   CheckCircle2,
   Clock,
 } from "lucide-react";
