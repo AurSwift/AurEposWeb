@@ -23,12 +23,12 @@ export default async function ReleasesPage({
   searchParams,
 }: ReleasesPageProps) {
   const params = await searchParams;
-  const releases = getAllReleases();
+  const releases = await getAllReleases();
   const highlightedVersion = params.version?.replace(/^v/, "");
 
   // If a specific version is requested, verify it exists
   const targetRelease = highlightedVersion
-    ? getReleaseByVersion(highlightedVersion)
+    ? await getReleaseByVersion(highlightedVersion)
     : undefined;
 
   return (

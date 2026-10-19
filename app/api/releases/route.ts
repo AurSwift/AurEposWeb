@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Return specific version
     if (version) {
-      const release = getReleaseByVersion(version);
+      const release = await getReleaseByVersion(version);
 
       if (!release) {
         return NextResponse.json(
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // Return latest release only
     if (latest) {
-      const release = getLatestRelease();
+      const release = await getLatestRelease();
 
       if (!release) {
         return NextResponse.json(
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Return all releases
-    const releases = getAllReleases();
+    const releases = await getAllReleases();
 
     return NextResponse.json(
       { releases },
